@@ -1,6 +1,8 @@
 import React from 'react';
 import {AbsoluteFill, Html5Audio, Html5Video, Img, OffthreadVideo, Sequence, useCurrentFrame, useVideoConfig} from 'remotion';
-import {sceneVisibleBounds, visibleScenesAtTime} from './transition-timing.mjs';
+import {sceneTransitionFramePlan} from './transition-timing.mjs';
+import {TransitionSeries, linearTiming} from '@remotion/transitions';
+import {transitionPresentation} from './transition-presentations.jsx';
 import {FontFaces} from './fonts.jsx';
 
 const clamp=(n,min=0,max=1)=>Math.max(min,Math.min(max,n));
@@ -11,29 +13,6 @@ const effects={
   soft:'blur(1.4px) contrast(.94)',fade:'saturate(.78) contrast(.88) brightness(1.05)',
   green:'hue-rotate(12deg) saturate(1.08)',purple:'hue-rotate(320deg) saturate(1.12)'
 };
-const transitionNames={
-  'Left':'slideleft','Pick Another':'fade','Zoom Swipe':'zoomin','Dive & Bounce':'circleopen',
-  'Snapshot Glam':'fadeblack','Pull & Reveal':'wiperight','Fundido':'fade','Deslizar derecha':'slideright',
-  'Deslizar arriba':'slideup','Deslizar abajo':'slidedown','Barrido izquierda':'wipeleft',
-  'Barrido derecha':'wiperight','Círculo cierre':'circleclose','Disolver':'dissolve',
-  'Pixelado':'pixelize','Blur':'hblur','Flash':'fadewhite'
-};
-function transitionStyle(name,progress,incoming){
-  const p=clamp(progress),q=incoming?p:1-p,type=transitionNames[name]||'fade';
-  if(type==='slideleft')return {transform:`translateX(${incoming?(1-p)*100:-p*100}%)`};
-  if(type==='slideright')return {transform:`translateX(${incoming?-(1-p)*100:p*100}%)`};
-  if(type==='slideup')return {transform:`translateY(${incoming?(1-p)*100:-p*100}%)`};
-  if(type==='slidedown')return {transform:`translateY(${incoming?-(1-p)*100:p*100}%)`};
-  if(type==='wipeleft')return {clipPath:`inset(0 ${incoming?(1-p)*100:p*100}% 0 0)`};
-  if(type==='wiperight')return {clipPath:`inset(0 0 0 ${incoming?(1-p)*100:p*100}%)`};
-  if(type==='circleopen'||type==='circleclose')return {clipPath:`circle(${q*75}% at 50% 50%)`};
-  if(type==='zoomin')return {opacity:q,transform:`scale(${incoming?1.3-.3*p:1+.3*p})`};
-  if(type==='pixelize')return {opacity:q,filter:`blur(${Math.sin(p*Math.PI)*11}px) contrast(1.4)`};
-  if(type==='hblur')return {opacity:q,filter:`blur(${Math.sin(p*Math.PI)*20}px)`};
-  if(type==='fadewhite')return {opacity:q,filter:`brightness(${1+Math.sin(p*Math.PI)*1.5})`};
-  if(type==='fadeblack')return {opacity:q,filter:`brightness(${1-Math.sin(p*Math.PI)*.65})`};
-  return {opacity:q};
-}
 function motionStyle(scene,progress){
   const p=clamp(progress),zoom=1+clamp(Number(scene.zoomPercent)||10,2,40)/100;
   switch(scene.motion){
@@ -53,15 +32,15 @@ function Media({asset,scene,style}){
   const props={src:asset.url,muted:true,trimBefore:Math.max(0,Math.round((Number(scene.sourceStart)||0)*30)),style,delayRenderTimeoutInMilliseconds:90000,delayRenderRetries:2};
   return asset.offthread?<OffthreadVideo {...props}/>:<Html5Video {...props} loop/>;
 }
-function SceneLayer({scene,assets,time,transition}){
-  const {fps}=useVideoConfig(),asset=assets[scene.assetId],length=Math.max(.05,scene.end-scene.start),p=clamp((time-scene.start)/length);
+function SceneLayer({scene,assets,time}){
+  const asset=assets[scene.assetId],length=Math.max(.05,scene.end-scene.start),p=clamp((time-scene.start)/length);
   const common={position:'absolute',width:'100%',height:'100%',objectFit:scene.fit==='fill'?'cover':'contain',...motionStyle(scene,p)};
   const blurredBackground=scene.fit==='blur'||scene.fit==='frame';
   const dim=clamp(Number(scene.blurOpacity||0)/100,0,.8);
   const overlay=assets[scene.overlayId],overlayStart=scene.start+(Number(scene.overlayStart)||0),overlayEnd=overlayStart+(Number(scene.overlayDuration)||length);
   const positions={center:{left:'50%',top:'50%',transform:'translate(-50%,-50%)'},'top-left':{left:'4%',top:'4%'},'top-right':{right:'4%',top:'4%'},'bottom-left':{left:'4%',bottom:'4%'},'bottom-right':{right:'4%',bottom:'4%'}};
   const entrance=clamp((time-overlayStart)/.3);
-  return <AbsoluteFill style={{overflow:'hidden',background:'#08080a',...transition}}>
+  return <AbsoluteFill style={{overflow:'hidden',background:'#08080a'}}>
     <AbsoluteFill style={{filter:effects[scene.effect]||'none'}}>
       {blurredBackground&&asset&&<><Media asset={asset} scene={scene} style={{...common,objectFit:'cover',filter:`blur(${Math.max(2,Number(scene.blur)||20)}px) brightness(${1-dim/2})`,transform:`scale(1.08) ${common.transform||''}`}}/><AbsoluteFill style={{background:`rgba(0,0,0,${dim/2})`}}/></>}
       {scene.fit==='frame'?<AbsoluteFill style={{padding:'5%',display:'grid',placeItems:'center'}}><div style={{position:'relative',width:'100%',height:'100%',overflow:'hidden'}}><Media asset={asset} scene={scene} style={{...common,objectFit:'contain'}}/></div></AbsoluteFill>:<Media asset={asset} scene={scene} style={common}/>}
@@ -102,14 +81,23 @@ function TextLayer({layer,time,height}){
   return <div style={style}>{content}</div>;
 }
 export function StudioComposition({project}){
-  const frame=useCurrentFrame(),{fps,height}=useVideoConfig(),time=frame/fps,scenes=project.scenes||[],assets=Object.fromEntries((project.assets||[]).map(a=>[a.id,a])),settings=project.settings||{};
-  const {indexes,transitionIndex,progress}=visibleScenesAtTime(scenes,time);
+  const frame=useCurrentFrame(),{fps,width,height,durationInFrames}=useVideoConfig(),time=frame/fps,scenes=project.scenes||[],assets=Object.fromEntries((project.assets||[]).map(a=>[a.id,a])),settings=project.settings||{};
+  const sceneFrames=sceneTransitionFramePlan(scenes,fps,durationInFrames);
   const cues=project.subtitleCues?.length?project.subtitleCues:project.cues||[];
   const caption=settings.captions===false?null:cues.find(c=>!c.hidden&&time>=c.start&&time<c.end);
   const narration=assets[project.narrationId],music=assets[project.musicId];
   return <AbsoluteFill style={{background:'#08080a'}}>
     {!project.audioOnly&&<><FontFaces base={project.fontBase} fonts={[settings.captionFont||'Inter',...(project.textLayers||[]).map(layer=>layer.font||'Inter')]}/>
-    {indexes.map(i=>{const scene=scenes[i],bounds=sceneVisibleBounds(scenes,i),from=Math.round(bounds.start*fps),until=Math.ceil(bounds.end*fps),transition=transitionIndex<0?{}:transitionStyle(scenes[transitionIndex].transition,progress,i===transitionIndex+1);return <Sequence key={i} from={from} durationInFrames={Math.max(1,until-from)}><SceneLayer scene={scene} assets={assets} time={time} transition={transition}/></Sequence>;})}
+    <TransitionSeries>{scenes.flatMap((scene,i)=>{
+      const previous=i>0?sceneFrames[i-1]:null;
+      const presentation=previous?.transitionFrames?transitionPresentation(scenes[i-1].transition,width,height):null;
+      return [
+        ...(presentation?[<TransitionSeries.Transition key={`transition-${i}`} timing={linearTiming({durationInFrames:previous.transitionFrames})} presentation={presentation}/>]:[]),
+        <TransitionSeries.Sequence key={`scene-${i}`} durationInFrames={sceneFrames[i].durationInFrames}>
+          <SceneLayer scene={scene} assets={assets} time={time}/>
+        </TransitionSeries.Sequence>
+      ];
+    })}</TransitionSeries>
     <Caption cue={caption} settings={settings} time={time} words={project.words}/>
     {(project.textLayers||[]).filter(layer=>time>=layer.start&&time<layer.end).map(layer=><TextLayer key={layer.id} layer={layer} time={time} height={height}/>)}</>}
     {!project.videoOnly&&<>{narration&&<Html5Audio src={narration.url} volume={1}/>}

@@ -1,5 +1,17 @@
 import {referenceWordsToSrt} from './reference-transcript.mjs';
-export const transitions = ['Corte','Left','Pick Another','Zoom Swipe','Dive & Bounce','Snapshot Glam','Pull & Reveal','Fundido','Deslizar derecha','Deslizar arriba','Deslizar abajo','Barrido izquierda','Barrido derecha','Círculo cierre','Disolver','Pixelado','Blur','Flash'];
+export const legacyTransitions = ['Corte','Left','Pick Another','Zoom Swipe','Dive & Bounce','Snapshot Glam','Pull & Reveal','Fundido','Deslizar derecha','Deslizar arriba','Deslizar abajo','Barrido izquierda','Barrido derecha','Círculo cierre','Disolver','Pixelado','Blur','Flash'];
+export const remotionTransitionOptions = [
+  ['remotion:fade','Fade'],['remotion:push-cut','Push Cut'],
+  ['remotion:slide:left','Slide desde izquierda'],['remotion:slide:right','Slide desde derecha'],['remotion:slide:top','Slide desde arriba'],['remotion:slide:bottom','Slide desde abajo'],
+  ['remotion:wipe:left','Wipe desde izquierda'],['remotion:wipe:top-left','Wipe diagonal superior izquierda'],['remotion:wipe:top','Wipe desde arriba'],['remotion:wipe:top-right','Wipe diagonal superior derecha'],['remotion:wipe:right','Wipe desde derecha'],['remotion:wipe:bottom-right','Wipe diagonal inferior derecha'],['remotion:wipe:bottom','Wipe desde abajo'],['remotion:wipe:bottom-left','Wipe diagonal inferior izquierda'],
+  ['remotion:flip:left','Flip desde izquierda'],['remotion:flip:right','Flip desde derecha'],['remotion:flip:top','Flip desde arriba'],['remotion:flip:bottom','Flip desde abajo'],
+  ['remotion:clock-wipe','Clock Wipe'],['remotion:iris','Iris'],['remotion:zoom-blur','Zoom Blur'],['remotion:dreamy-zoom','Dreamy Zoom'],['remotion:film-burn','Film Burn'],['remotion:linear-blur','Linear Blur'],
+  ['remotion:book-flip:left','Book Flip desde izquierda'],['remotion:book-flip:right','Book Flip desde derecha'],['remotion:book-flip:top','Book Flip desde arriba'],['remotion:book-flip:bottom','Book Flip desde abajo'],
+  ['remotion:zoom-in-out','Zoom In Out'],['remotion:dissolve','Dissolve'],['remotion:ripple','Ripple'],['remotion:crosswarp','Crosswarp'],['remotion:cross-zoom','Cross Zoom'],['remotion:swap','Swap'],
+  ['remotion:blur-slide:left','Blur Slide desde izquierda'],['remotion:blur-slide:right','Blur Slide desde derecha'],['remotion:blur-slide:top','Blur Slide desde arriba'],['remotion:blur-slide:bottom','Blur Slide desde abajo']
+];
+export const transitionLabels=Object.fromEntries(remotionTransitionOptions);
+export const transitions=[...legacyTransitions,...remotionTransitionOptions.map(([id])=>id)];
 export const transitionFilters = { 'Left':'slideleft', 'Pick Another':'fade', 'Zoom Swipe':'zoomin', 'Dive & Bounce':'circleopen', 'Snapshot Glam':'fadeblack', 'Pull & Reveal':'wiperight','Fundido':'fade','Deslizar derecha':'slideright','Deslizar arriba':'slideup','Deslizar abajo':'slidedown','Barrido izquierda':'wipeleft','Barrido derecha':'wiperight','Círculo cierre':'circleclose','Disolver':'dissolve','Pixelado':'pixelize','Blur':'hblur','Flash':'fadewhite' };
 export const videoEffects = ['warm','cool','mono','vivid','vintage','contrast','soft','fade','green','purple'];
 export const imageMotions = ['static','zoom-in','zoom-out','pan-left','pan-right','pan-up','pan-down','pulse'];

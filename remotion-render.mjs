@@ -31,7 +31,7 @@ function checkpointKey(project,prepared,folder,quality){
   const ids=new Set([...(project.scenes||[]).flatMap(scene=>[scene.assetId,scene.overlayId,scene.sfxId]),project.narrationId,project.musicId]);
   const assets=prepared.assets.filter(asset=>ids.has(asset.id)).map(asset=>({...asset,url:new URL(asset.url).pathname+new URL(asset.url).search}));
   hash.update(JSON.stringify({...prepared,fontBase:'/fonts',assets,quality}));
-  for(const name of ['remotion/composition.jsx','remotion/transition-timing.mjs','remotion/fonts.jsx','remotion/root.jsx'])hash.update(readFileSync(join(ROOT,name)));
+  for(const name of ['remotion/composition.jsx','remotion/transition-timing.mjs','remotion/transition-presentations.jsx','remotion/fonts.jsx','remotion/root.jsx'])hash.update(readFileSync(join(ROOT,name)));
   for(const asset of project.assets||[])if(ids.has(asset.id)){
     const stat=statSync(join(folder,'assets',asset.file));
     hash.update(`${asset.id}:${stat.size}:${stat.mtimeMs};`);

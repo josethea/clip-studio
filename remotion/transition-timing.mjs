@@ -24,3 +24,15 @@ export function sceneVisibleBounds(scenes, index) {
   const nextHalf = index < scenes.length - 1 ? (Number(scene.transitionSeconds) || 0) / 2 : 0;
   return {start: scene.start - previousHalf, end: scene.end + nextHalf};
 }
+
+export function sceneTransitionFramePlan(scenes, fps, totalFrames) {
+  const cuts = scenes.slice(0, -1).map(scene => Math.round(Number(scene.end) * fps));
+  const overlaps = scenes.slice(0, -1).map(scene => Math.max(0, Math.round((Number(scene.transitionSeconds) || 0) * fps)));
+  return scenes.map((scene, index) => {
+    const before = index ? Math.floor(overlaps[index - 1] / 2) : 0;
+    const after = index < overlaps.length ? Math.ceil(overlaps[index] / 2) : 0;
+    const startFrame = (index ? cuts[index - 1] : 0) - before;
+    const endFrame = (index < cuts.length ? cuts[index] : totalFrames) + after;
+    return {startFrame, durationInFrames: endFrame - startFrame, transitionFrames: overlaps[index] || 0};
+  });
+}
