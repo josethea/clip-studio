@@ -1,16 +1,26 @@
 const $=id=>document.getElementById(id);
-let connected=false,searchTabId=null,searches=0,server='';
+let connected=false,searchTabId=null,searches=0,server='',authorization='';
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 function log(message){$('log').textContent=`[${new Date().toLocaleTimeString()}] ${message}\n`+$('log').textContent.slice(0,6000);}
 function status(message){$('state').textContent=message;}
 function baseUrl(value){
   const url=new URL(value.trim());
-  if(url.protocol!=='http:'||!['127.0.0.1','localhost'].includes(url.hostname)||!url.port)throw Error('Usa la dirección local de Clip Studio, por ejemplo http://127.0.0.1:4173');
+  const local=url.protocol==='http:'&&['127.0.0.1','localhost'].includes(url.hostname)&&url.port;
+  const hosted=url.protocol==='https:'&&url.hostname==='studio.jthea.tech';
+  if(!local&&!hosted)throw Error('Usa http://127.0.0.1:4173 o https://studio.jthea.tech');
+  if(url.username||url.password)throw Error('Escribe el usuario y la contraseña en sus campos, no en la URL');
   return url.origin;
 }
 async function api(path,body){
-  const response=await fetch(`${server}/api/studio/google-bridge/${path}`,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  const data=await response.json();if(!response.ok)throw Error(data.error||`Clip Studio respondió ${response.status}`);return data;
+  const headers=authorization?{Authorization:authorization}:{};
+  if(body!==undefined)headers['Content-Type']='application/json';
+  const response=await fetch(`${server}/api/studio/google-bridge/${path}`,{method:body===undefined?'GET':'POST',headers,...(body===undefined?{}:{body:JSON.stringify(body)})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok){
+    if(response.status===401)throw Error('Caddy rechazó el acceso. Comprueba el usuario y la contraseña.');
+    throw Error(data.error||`Clip Studio respondió ${response.status}`);
+  }
+  return data;
 }
 async function waitComplete(tabId){
   const current=await chrome.tabs.get(tabId);if(current.status==='complete')return;
@@ -60,7 +70,16 @@ async function loop(){
   $('connect').disabled=false;$('disconnect').disabled=true;
 }
 $('connect').onclick=async()=>{
-  try{server=baseUrl($('server').value);await api('heartbeat',{});connected=true;$('connect').disabled=true;$('disconnect').disabled=false;await chrome.storage.local.set({clipStudioServer:server});log(`Conectado a ${server}`);loop();}
+  try{
+    server=baseUrl($('server').value);
+    const username=$('username').value.trim(),password=$('password').value;
+    if(Boolean(username)!==Boolean(password))throw Error('Completa usuario y contraseña, o deja ambos vacíos si Caddy no tiene autenticación');
+    authorization=username?`Basic ${btoa(String.fromCharCode(...new TextEncoder().encode(`${username}:${password}`)))}`:'';
+    await api('heartbeat',{});
+    connected=true;$('connect').disabled=true;$('disconnect').disabled=false;
+    await chrome.storage.local.set({clipStudioServer:server});
+    log(`Conectado a ${server}`);loop();
+  }
   catch(error){status(error.message);}
 };
 $('disconnect').onclick=()=>{connected=false;status('Desconectado');};

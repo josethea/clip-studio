@@ -393,7 +393,7 @@ export async function studioRequest(req,res,url){
   try{
     if(path.startsWith('/api/studio/google-bridge/')){
       const origin=String(req.headers.origin||'');
-      if(origin&&/^chrome-extension:\/\/[a-z]{32}$/.test(origin)){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Headers','Content-Type');res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');}
+      if(origin&&/^chrome-extension:\/\/[a-z]{32}$/.test(origin)){res.setHeader('Access-Control-Allow-Origin',origin);res.setHeader('Vary','Origin');res.setHeader('Access-Control-Allow-Headers','Authorization, Content-Type');res.setHeader('Access-Control-Allow-Methods','GET, POST, OPTIONS');}
       else if(origin)throw Error('Origen de extensión no permitido');
       if(req.method==='OPTIONS'){res.writeHead(204);res.end();return true;}
       const action=path.slice('/api/studio/google-bridge/'.length);
