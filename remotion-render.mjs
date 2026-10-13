@@ -3,6 +3,7 @@ import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
 import {existsSync,mkdirSync,readFileSync,renameSync,rmSync,statSync,writeFileSync} from 'node:fs';
 import {dirname,join,resolve} from 'node:path';
+import {availableParallelism} from 'node:os';
 import {bundle} from '@remotion/bundler';
 import {selectComposition,renderMedia} from '@remotion/renderer';
 import {prepareRemotionProject} from './remotion-data.mjs';
@@ -12,6 +13,8 @@ import {prepareRenderImages} from './render-image-preflight.mjs';
 import {browserLaunchError} from './remotion-browser-diagnostics.mjs';
 
 const ROOT=resolve(import.meta.dirname),execute=promisify(execFile),CHUNK_FRAMES=1800;
+const requestedConcurrency=Number.parseInt(process.env.CLIP_STUDIO_RENDER_CONCURRENCY||'2',10);
+const renderConcurrency=Number.isFinite(requestedConcurrency)?Math.max(1,Math.min(availableParallelism(),requestedConcurrency)):2;
 let bundlePromise;
 
 async function probe(file,kind){
@@ -83,7 +86,7 @@ export async function renderWithRemotion(project,folder,update){
       for(let attempt=1;attempt<=2;attempt++){
         try{
           update(12+Math.round(index/segments*78),`Renderizando tramo ${index+1}/${segments}${attempt>1?' · segundo intento':''}`);
-          await renderMedia({...options,composition,inputProps:videoProps,codec:'h264',...quality,outputLocation:temporary,overwrite:true,muted:true,frameRange:[from,to],concurrency:2,timeoutInMilliseconds:90000,onProgress:({progress})=>update(12+Math.round((index+progress)/segments*78),`Renderizando tramo ${index+1}/${segments} · ${Math.round(progress*100)}%`)});
+          await renderMedia({...options,composition,inputProps:videoProps,codec:'h264',...quality,outputLocation:temporary,overwrite:true,muted:true,frameRange:[from,to],concurrency:renderConcurrency,timeoutInMilliseconds:90000,onProgress:({progress})=>update(12+Math.round((index+progress)/segments*78),`Renderizando tramo ${index+1}/${segments} · ${Math.round(progress*100)}%`)});
           if(!await validVideo(temporary,count))throw Error(`El tramo ${index+1} quedó incompleto`);
           renameSync(temporary,file);
           break;
@@ -105,7 +108,7 @@ export async function renderWithRemotion(project,folder,update){
         try{
           const audioProps={project:{...prepared,audioOnly:true}};
           const audioComposition=await selectComposition({...options,id:'ClipStudio',inputProps:audioProps});
-          await renderMedia({...options,composition:audioComposition,inputProps:audioProps,codec:'aac',audioBitrate:'192k',outputLocation:temporary,overwrite:true,concurrency:2,timeoutInMilliseconds:90000,onProgress:({progress})=>update(94+Math.round(progress*3),`Mezclando audio · ${Math.round(progress*100)}%`)});
+          await renderMedia({...options,composition:audioComposition,inputProps:audioProps,codec:'aac',audioBitrate:'192k',outputLocation:temporary,overwrite:true,concurrency:renderConcurrency,timeoutInMilliseconds:90000,onProgress:({progress})=>update(94+Math.round(progress*3),`Mezclando audio · ${Math.round(progress*100)}%`)});
           if(!await probe(temporary,'audio'))throw Error('No se pudo generar la pista de audio');
           renameSync(temporary,audio);
         }finally{rmSync(temporary,{force:true});}

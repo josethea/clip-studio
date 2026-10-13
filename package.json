@@ -12,6 +12,7 @@
     "node": ">=22"
   },
   "dependencies": {
+    "@reduxjs/toolkit": "^2.13.0",
     "@remotion/bundler": "4.0.534",
     "@remotion/player": "4.0.534",
     "@remotion/renderer": "4.0.534",
@@ -19,6 +20,7 @@
     "esbuild": "^0.25.12",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "react-redux": "^9.3.0",
     "remotion": "4.0.534",
     "tesseract.js": "^7.0.0"
   }

@@ -10,18 +10,36 @@ export const remotionTransitionOptions = [
   ['remotion:zoom-in-out','Zoom In Out'],['remotion:dissolve','Dissolve'],['remotion:ripple','Ripple'],['remotion:crosswarp','Crosswarp'],['remotion:cross-zoom','Cross Zoom'],['remotion:swap','Swap'],
   ['remotion:blur-slide:left','Blur Slide desde izquierda'],['remotion:blur-slide:right','Blur Slide desde derecha'],['remotion:blur-slide:top','Blur Slide desde arriba'],['remotion:blur-slide:bottom','Blur Slide desde abajo']
 ];
-export const transitionLabels=Object.fromEntries(remotionTransitionOptions);
-export const transitions=[...legacyTransitions,...remotionTransitionOptions.map(([id])=>id)];
-export const transitionFilters = { 'Left':'slideleft', 'Pick Another':'fade', 'Zoom Swipe':'zoomin', 'Dive & Bounce':'circleopen', 'Snapshot Glam':'fadeblack', 'Pull & Reveal':'wiperight','Fundido':'fade','Deslizar derecha':'slideright','Deslizar arriba':'slideup','Deslizar abajo':'slidedown','Barrido izquierda':'wipeleft','Barrido derecha':'wiperight','Círculo cierre':'circleclose','Disolver':'dissolve','Pixelado':'pixelize','Blur':'hblur','Flash':'fadewhite' };
+export const transitionLabels={ 'remotion:none':'Sin transición', ...Object.fromEntries(remotionTransitionOptions)};
+export const transitions=['remotion:none',...remotionTransitionOptions.map(([id])=>id)];
+// Projects saved before the Remotion transition picker used these names. Keep
+// them readable, but never send the old effects back into a render.
+export function normalizeTransition(value){
+  if(transitions.includes(value))return value;
+  if(value==='Corte')return 'remotion:none';
+  return legacyTransitions.includes(value)?'remotion:fade':'remotion:none';
+}
+export function migrateProjectTransitions(project){
+  const settings=project.settings||{};
+  let changed=false;
+  if(Array.isArray(settings.transitionSequence)){
+    const next=settings.transitionSequence.map(normalizeTransition);
+    if(next.some((value,index)=>value!==settings.transitionSequence[index])){settings.transitionSequence=next;changed=true;}
+  }
+  for(const scene of project.scenes||[]){
+    for(const key of ['transition','transitionOverride'])if(scene[key]&&scene[key]!==normalizeTransition(scene[key])){scene[key]=normalizeTransition(scene[key]);changed=true;}
+  }
+  return changed;
+}
 export const videoEffects = ['warm','cool','mono','vivid','vintage','contrast','soft','fade','green','purple'];
 export const imageMotions = ['static','zoom-in','zoom-out','pan-left','pan-right','pan-up','pan-down','pulse'];
 export function effectiveScene(project,scene,index){
   const settings=project.settings||{};
   const mediaType=project.assets?.find(a=>a.id===scene.assetId)?.type;
-  const transitionSequence=Array.isArray(settings.transitionSequence)?settings.transitionSequence.filter(x=>transitions.includes(x)):[scene.transition||'Corte'];
+  const transitionSequence=Array.isArray(settings.transitionSequence)?settings.transitionSequence.map(normalizeTransition):[normalizeTransition(scene.transition)];
   const effectSequence=Array.isArray(settings.effectSequence)?settings.effectSequence.filter(x=>videoEffects.includes(x)):[scene.effect||'none'];
   return {...scene,
-    transition:scene.transitionOverride||transitionSequence[index%Math.max(1,transitionSequence.length)]||'Corte',
+    transition:scene.transitionOverride?normalizeTransition(scene.transitionOverride):transitionSequence[index%Math.max(1,transitionSequence.length)]||'remotion:none',
     transitionDuration:Number(scene.transitionDurationOverride??settings.transitionDuration??scene.transitionDuration??.45),
     effect:scene.effectOverride||effectSequence[index%Math.max(1,effectSequence.length)]||'none',
     fit:scene.fitOverride||(mediaType==='video'?(settings.videoFit||'fill'):(settings.imageFit||settings.fit||scene.fit||'blur')),
@@ -33,7 +51,7 @@ export function effectiveScene(project,scene,index){
 export function transitionSeconds(project,index){
   const scenes=project.scenes||[],raw=scenes[index],next=scenes[index+1];if(!raw||!next)return 0;
   const scene=effectiveScene(project,raw,index),seconds=Number(scene.transitionDuration);
-  return scene.transition!=='Corte'&&Number.isFinite(seconds)&&seconds>0&&raw.end-raw.start+1e-6>=seconds&&next.end-next.start+1e-6>=seconds?seconds:0;
+  return scene.transition!=='remotion:none'&&Number.isFinite(seconds)&&seconds>0&&raw.end-raw.start+1e-6>=seconds&&next.end-next.start+1e-6>=seconds?seconds:0;
 }
 
 export function parseSrt(source) {
@@ -219,5 +237,5 @@ export function makeScenes(cues,chapters=[],mode='srt',options={}) {
     const chapter=chapters.find(ch=>i>=ch.cueStart&&i<=ch.cueEnd);
     groups.push({first:i,last:i,chapter,chapterSceneIndex:chapter?i-chapter.cueStart:i,searchTerm:options.searchTerms?.[i]?.searchTerm||chapter?.searchTerms?.[(i-chapter.cueStart)%(chapter.searchTerms?.length||1)]||''});
   }
-  return groups.map(({first,last,chapter,chapterSceneIndex,searchTerm},i)=>({id:i+1,start:i===0?0:cues[first].start,end:cues[last+1]?.start??cues[last].end,text:cues.slice(first,last+1).map(c=>c.text).join(' '),cueStart:first,cueEnd:last,chapterId:chapter?.id||null,chapterSceneIndex,searchTerm,assetId:null,sourceStart:0,fit:'blur',blur:20,motion:'static',effect:'none',transition:'Corte',transitionDuration:.45,sfxId:null,sfxVolume:70,sfxAlign:'center',sfxOffset:0})).filter(s=>s.end>s.start);
+  return groups.map(({first,last,chapter,chapterSceneIndex,searchTerm},i)=>({id:i+1,start:i===0?0:cues[first].start,end:cues[last+1]?.start??cues[last].end,text:cues.slice(first,last+1).map(c=>c.text).join(' '),cueStart:first,cueEnd:last,chapterId:chapter?.id||null,chapterSceneIndex,searchTerm,assetId:null,sourceStart:0,fit:'blur',blur:20,motion:'static',effect:'none',transition:'remotion:none',transitionDuration:.45,sfxId:null,sfxVolume:70,sfxAlign:'center',sfxOffset:0})).filter(s=>s.end>s.start);
 }

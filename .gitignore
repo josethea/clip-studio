@@ -3,6 +3,7 @@ data/*
 node_modules/
 .remotion-bundle/
 public/remotion-player.js
+public/studio-ui.js
 .env
 *.log
 .DS_Store

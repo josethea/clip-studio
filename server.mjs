@@ -6,7 +6,7 @@ import {studioRequest} from './studio-server.mjs';
 const ROOT=resolve(import.meta.dirname),PUBLIC=join(ROOT,'public'),PORT=Number(process.env.PORT||4173);
 const files=new Map([
   ['/','studio.html'],['/studio.html','studio.html'],['/studio.js','studio.js'],
-  ['/studio.css','studio.css'],['/style.css','style.css'],['/remotion-player.js','remotion-player.js']
+  ['/studio.css','studio.css'],['/style.css','style.css'],['/remotion-player.js','remotion-player.js'],['/studio-ui.js','studio-ui.js']
 ]);
 const types={'.html':'text/html; charset=utf-8','.css':'text/css; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8'};
 function error(res,code,message){const body=JSON.stringify({error:message});res.writeHead(code,{'content-type':'application/json; charset=utf-8','content-length':Buffer.byteLength(body)});res.end(body);}

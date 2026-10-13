@@ -1,9 +1,9 @@
-import {createReadStream,createWriteStream,existsSync,mkdirSync,readFileSync,writeFileSync,readdirSync,statSync,copyFileSync,rmSync} from 'node:fs';
+import {createReadStream,createWriteStream,existsSync,mkdirSync,readFileSync,writeFileSync,readdirSync,statSync,rmSync} from 'node:fs';
 import {join,basename,extname,resolve} from 'node:path';
 import {pipeline} from 'node:stream/promises';
 import {spawn} from 'node:child_process';
 import {randomUUID,createHash} from 'node:crypto';
-import {parseSrt,serializeSrt,planAudioGaps,transitionFilters,effectiveScene,transitionSeconds} from './studio-core.mjs';
+import {parseSrt,serializeSrt,planAudioGaps,transitionSeconds} from './studio-core.mjs';
 import {exportCapCut} from './capcut-export.mjs';
 import {GeminiHttpError,withGeminiRetry} from './gemini-retry.mjs';
 import {renderWithRemotion} from './remotion-render.mjs';
@@ -32,97 +32,6 @@ const task=(p,kind,action)=>{const t={id:randomUUID(),projectId:p.id,kind,status
 function streamFile(req,res,path,type){if(!existsSync(path)){json(res,404,{error:'Archivo no encontrado'});return;}const size=statSync(path).size,range=req.headers.range,headers={'content-type':type,'accept-ranges':'bytes'};
   if(range){const match=/^bytes=(\d*)-(\d*)$/.exec(range);let start=Number(match?.[1]||0),end=match?.[2]?Number(match[2]):size-1;if(match&&!match[1]&&match[2]){start=Math.max(0,size-Number(match[2]));end=size-1;}if(!match||start>=size||end<start){res.writeHead(416,{...headers,'content-range':`bytes */${size}`});res.end();return;}end=Math.min(end,size-1);res.writeHead(206,{...headers,'content-length':end-start+1,'content-range':`bytes ${start}-${end}/${size}`});createReadStream(path,{start,end}).pipe(res);return;}
   res.writeHead(200,{...headers,'content-length':size});createReadStream(path).pipe(res);}
-const ffconcatPath=path=>`file '${path.replaceAll("'","'\\''")}'`;
-
-async function captionTrack(p,cues,style,color,duration){
-  const work=join(dirOf(p),'renders'),stamp=Date.now(),source=join(work,`captions-${stamp}.json`),folder=join(work,`captions-${stamp}`);
-  writeFileSync(source,JSON.stringify([...cues.map(c=>({text:c.text,style,color})),{text:'',style,color}]));
-  await run('swift',[join(ROOT,'captions.swift'),source,folder]);
-  const blank=join(folder,`caption-${cues.length}.png`),lines=['ffconcat version 1.0'];let cursor=0;
-  const add=(file,seconds)=>{if(seconds>.001)lines.push(ffconcatPath(file),`duration ${seconds.toFixed(6)}`);};
-  cues.forEach((c,i)=>{const start=Math.max(cursor,c.start),end=Math.min(duration,Math.max(start,c.end));add(blank,start-cursor);add(join(folder,`caption-${i}.png`),end-start);cursor=end;});
-  add(blank,Math.max(.04,duration-cursor));lines.push(ffconcatPath(blank));
-  const manifest=join(work,`caption-${stamp}.ffconcat`),output=join(work,`caption-${stamp}.mov`);writeFileSync(manifest,lines.join('\n'));
-  await run('ffmpeg',['-y','-hide_banner','-loglevel','error','-f','concat','-safe','0','-i',manifest,'-vf','fps=30,format=argb','-c:v','qtrle','-t',String(duration),output]);return output;
-}
-
-async function renderProject(p,update,{preview=false}={}){
-  if(!p.scenes?.length)throw Error('Importa el SRT y crea escenas primero');
-  const missing=p.scenes.filter(s=>!asset(p,s.assetId));if(missing.length)throw Error(`Faltan medios en ${missing.length} escenas. Asigna un asset a cada una.`);
-  const ratio=p.settings?.ratio==='16:9'?'16:9':'9:16',quality=p.settings?.quality==='1080p'?1080:720;
-  const width=ratio==='9:16'?quality:Math.round(quality*16/9/2)*2,height=ratio==='9:16'?Math.round(quality*16/9/2)*2:quality;
-  const work=join(dirOf(p),'renders');mkdirSync(work,{recursive:true});const stamp=Date.now(),parts=[];
-  const end=p.scenes.at(-1).end;
-  for(let i=0;i<p.scenes.length;i++){
-    const scene=effectiveScene(p,p.scenes[i],i),media=asset(p,scene.assetId),path=assetPath(p,scene.assetId),duration=scene.end-scene.start;
-    if(!(duration>.05))throw Error(`Duración inválida en escena ${i+1}`);
-    const transition=transitionSeconds(p,i);
-    const length=duration+transition,out=join(work,`scene-${stamp}-${String(i).padStart(4,'0')}.mp4`),args=['-y','-hide_banner','-loglevel','error'];
-    if(media.type==='image')args.push('-loop','1','-framerate','30','-i',path);
-    else args.push('-stream_loop','-1','-ss',String(Math.max(0,Number(scene.sourceStart)||0)),'-i',path);
-    const blur=Math.max(2,Math.min(70,Number(scene.blur)||20));
-    const dim=Math.max(0,Math.min(.8,Number(scene.blurOpacity||0)/100));
-    const frameWidth=Math.round(width*.9/2)*2,frameHeight=Math.round(height*.9/2)*2;
-    let filter;
-    if(scene.fit==='fill')filter=`scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height}`;
-    else if(scene.fit==='contain')filter=`scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=0x08080a`;
-    else if(scene.fit==='frame')filter=`split=2[bg][fg];[bg]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=${blur}:2,eq=brightness=${(-dim/2).toFixed(3)}[b];[fg]scale=${frameWidth}:${frameHeight}:force_original_aspect_ratio=decrease[f];[b][f]overlay=(W-w)/2:(H-h)/2`;
-    else filter=`split=2[bg][fg];[bg]scale=${width}:${height}:force_original_aspect_ratio=increase,crop=${width}:${height},boxblur=${blur}:2,eq=brightness=${(-dim/2).toFixed(3)}[b];[fg]scale=${width}:${height}:force_original_aspect_ratio=decrease[f];[b][f]overlay=(W-w)/2:(H-h)/2`;
-    const effects={mono:'hue=s=0',warm:'eq=saturation=1.15:gamma_r=1.07',cool:'eq=saturation=1.08:gamma_b=1.06',vivid:'eq=saturation=1.45:contrast=1.10',vintage:'eq=saturation=0.72:gamma_r=1.08:gamma_b=0.91',contrast:'eq=contrast=1.30',soft:'gblur=sigma=1.4,eq=contrast=0.94',fade:'eq=saturation=0.78:contrast=0.88:brightness=0.05',green:'eq=gamma_g=1.10:gamma_r=0.97',purple:'eq=gamma_r=1.06:gamma_b=1.10'};
-    if(effects[scene.effect])filter+=','+effects[scene.effect];
-    const zoom=1+Math.max(2,Math.min(40,Number(scene.zoomPercent)||10))/100,frames=Math.max(1,Math.round(duration*30)),step=((zoom-1)/frames).toFixed(7),target=zoom.toFixed(4),pan=`:d=1:s=${width}x${height}:fps=30`;
-    if(scene.motion==='zoom-in')filter+=`,zoompan=z='min(zoom+${step},${target})':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2'${pan}`;
-    if(scene.motion==='zoom-out')filter+=`,zoompan=z='if(eq(on,1),${target},max(1,zoom-${step}))':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2'${pan}`;
-    if(scene.motion==='pan-left')filter+=`,zoompan=z=${target}:x='(iw-iw/zoom)*(1-min(1,on/${frames}))':y='(ih-ih/zoom)/2'${pan}`;
-    if(scene.motion==='pan-right')filter+=`,zoompan=z=${target}:x='(iw-iw/zoom)*min(1,on/${frames})':y='(ih-ih/zoom)/2'${pan}`;
-    if(scene.motion==='pan-up')filter+=`,zoompan=z=${target}:x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*(1-min(1,on/${frames}))'${pan}`;
-    if(scene.motion==='pan-down')filter+=`,zoompan=z=${target}:x='(iw-iw/zoom)/2':y='(ih-ih/zoom)*min(1,on/${frames})'${pan}`;
-    if(scene.motion==='pulse')filter+=`,zoompan=z='1+(${(zoom-1).toFixed(4)})*(1-cos(on*PI*2/${frames}))/2':x='iw/2-iw/zoom/2':y='ih/2-ih/zoom/2'${pan}`;
-    filter+=',setsar=1,format=yuv420p';
-    const overlayAsset=asset(p,scene.overlayId),hasOverlay=overlayAsset?.type==='image';if(hasOverlay)args.push('-loop','1','-framerate','30','-i',assetPath(p,scene.overlayId));
-    let graph=`[0:v]${filter}[v]`;
-    if(hasOverlay){
-      const size=Math.max(5,Math.min(90,Number(scene.overlaySize)||35)),opacity=Math.max(0,Math.min(1,Number(scene.overlayOpacity??100)/100)),start=Math.max(0,Math.min(duration,Number(scene.overlayStart)||0)),visible=Math.max(.1,Math.min(duration-start,Number(scene.overlayDuration)||duration)),finish=start+visible,margin=Math.round(width*.04);
-      const positions={center:[`(W-w)/2`,`(H-h)/2`],'top-left':[String(margin),String(margin)],'top-right':[`W-w-${margin}`,String(margin)],'bottom-left':[String(margin),`H-h-${margin}`],'bottom-right':[`W-w-${margin}`,`H-h-${margin}`]};let [x,y]=positions[scene.overlayPosition]||positions.center;
-      if(scene.overlayAnimation==='slide')x=`if(lt(t,${(start+.35).toFixed(3)}),(${x})-W*0.12*(1-(t-${start.toFixed(3)})/0.35),${x})`;
-      const entrance=scene.overlayAnimation==='slide'?'':`,fade=t=in:st=${start.toFixed(3)}:d=0.3:alpha=1`;
-      graph=`[0:v]${filter}[base];[1:v]scale=${Math.round(width*size/100/2)*2}:-2,format=rgba,colorchannelmixer=aa=${opacity.toFixed(3)}${entrance}[ov];[base][ov]overlay=x='${x}':y='${y}':enable='between(t,${start.toFixed(3)},${finish.toFixed(3)})':shortest=1:eval=frame,format=yuv420p[v]`;
-    }
-    args.push('-filter_complex',graph,'-map','[v]','-t',length.toFixed(4),'-r','30','-an','-c:v','libx264','-preset','veryfast','-crf','22','-pix_fmt','yuv420p',out);
-    await run('ffmpeg',args);parts.push({path:out,duration,transition,name:transitionFilters[scene.transition]||'fade'});
-    update(5+Math.round((i+1)/p.scenes.length*65),`Preparando escena ${i+1}/${p.scenes.length}`);
-  }
-  const chunks=[];
-  for(let begin=0;begin<parts.length;begin+=8){const batch=parts.slice(begin,begin+8),out=join(work,`chunk-${stamp}-${begin}.mp4`);
-    if(batch.length===1){copyFileSync(batch[0].path,out);}else{
-      const args=['-y','-hide_banner','-loglevel','error'];batch.forEach(x=>args.push('-i',x.path));
-      // xfade emits AVTB while H.264 inputs commonly use 1/15360. Normalize
-      // every input before chaining transitions so their timebases match.
-      const filters=batch.map((_,i)=>`[${i}:v]fps=30,settb=AVTB,setpts=PTS-STARTPTS[v${i}]`);
-      let label='v0',offset=batch[0].duration;
-      for(let i=1;i<batch.length;i++){const previous=batch[i-1],d=previous.transition,next=`x${i}`;filters.push(d>0?`[${label}][v${i}]xfade=transition=${previous.name}:duration=${d.toFixed(4)}:offset=${offset.toFixed(4)}[${next}]`:`[${label}][v${i}]concat=n=2:v=1:a=0[${next}]`);label=next;offset+=batch[i].duration;}
-      args.push('-filter_complex',filters.join(';'),'-map',`[${label}]`,'-an','-c:v','libx264','-preset','veryfast','-crf','21','-pix_fmt','yuv420p','-t',String(batch.reduce((n,x)=>n+x.duration,0)+batch.at(-1).transition),out);await run('ffmpeg',args);
-    }
-    chunks.push({path:out,duration:batch.reduce((n,x)=>n+x.duration,0),transition:batch.at(-1).transition,name:batch.at(-1).name});update(72+Math.round(chunks.length/Math.ceil(parts.length/8)*12),`Uniendo bloque ${chunks.length}`);
-  }
-  const visual=join(work,`visual-${stamp}.mp4`);
-  if(chunks.length===1)copyFileSync(chunks[0].path,visual);
-  else{const args=['-y','-hide_banner','-loglevel','error'];chunks.forEach(chunk=>args.push('-i',chunk.path));const filters=chunks.map((_,i)=>`[${i}:v]fps=30,settb=AVTB,setpts=PTS-STARTPTS[v${i}]`);let label='v0',offset=chunks[0].duration;for(let i=1;i<chunks.length;i++){const previous=chunks[i-1],next=`b${i}`;filters.push(previous.transition>0?`[${label}][v${i}]xfade=transition=${previous.name}:duration=${previous.transition.toFixed(4)}:offset=${offset.toFixed(4)}[${next}]`:`[${label}][v${i}]concat=n=2:v=1:a=0[${next}]`);label=next;offset+=chunks[i].duration;}args.push('-filter_complex',filters.join(';'),'-map',`[${label}]`,'-an','-c:v','libx264','-preset','veryfast','-crf','21','-pix_fmt','yuv420p','-t',String(end),visual);await run('ffmpeg',args);}
-  const visualDuration=(await probe(visual)).duration;
-  let captions=null;const subtitleCues=p.subtitleCues?.length?p.subtitleCues:p.cues;if(p.settings?.captions!==false&&subtitleCues?.length){captions=await captionTrack(p,subtitleCues,p.settings?.captionStyle||'cine',p.settings?.captionColor||'yellow',visualDuration);}
-  const output=join(work,`${preview?'preview':'video'}-${stamp}.mp4`),args=['-y','-hide_banner','-loglevel','error','-i',visual],filters=[];let video='0:v';
-  if(captions){const index=args.filter(x=>x==='-i').length;args.push('-i',captions);filters.push(`[0:v][${index}:v]overlay=(W-w)/2:H-h-${Math.round(height*.08)}:shortest=1[v]`);video='[v]';}
-  const audioInputs=[];for(const [key,volume] of [[p.narrationId,1],[p.musicId,Math.max(0,Math.min(1,Number(p.settings?.musicVolume??20)/100))]])if(asset(p,key)){const index=args.filter(x=>x==='-i').length;args.push('-i',assetPath(p,key));audioInputs.push({index,volume,delay:0,loop:key===p.musicId});}
-  for(const [i,raw] of p.scenes.entries()){const scene=effectiveScene(p,raw,i);if(!asset(p,scene.sfxId)||i===p.scenes.length-1)continue;const index=args.filter(x=>x==='-i').length;args.push('-i',assetPath(p,scene.sfxId));const d=Math.max(.05,Number(scene.transitionDuration)||.4),align=scene.sfxAlign||'center',shift=align==='start'?0:align==='end'?-d:-d/2;audioInputs.push({index,volume:Math.max(0,Math.min(1,Number(scene.sfxVolume??70)/100)),delay:Math.max(0,scene.end+shift+Number(scene.sfxOffset||0)),sfx:true,length:d});}
-  const audioLabels=[];audioInputs.forEach((input,i)=>{const label=`a${i}`,delay=Math.round(input.delay*1000);filters.push(`[${input.index}:a]${input.loop?'aloop=loop=-1:size=2147483647,':''}atrim=duration=${(input.length||visualDuration).toFixed(4)},asetpts=PTS-STARTPTS,volume=${input.volume.toFixed(3)}${delay?`,adelay=${delay}:all=1`:''}[${label}]`);audioLabels.push(label);});
-  if(audioLabels.length)filters.push(`${audioLabels.map(x=>`[${x}]`).join('')}amix=inputs=${audioLabels.length}:duration=longest:normalize=0:dropout_transition=0,apad,atrim=duration=${visualDuration.toFixed(4)}[a]`);
-  if(filters.length)args.push('-filter_complex',filters.join(';'));
-  args.push('-map',video);if(audioLabels.length)args.push('-map','[a]','-c:a','aac','-b:a','192k');else args.push('-an');
-  args.push('-c:v','libx264','-preset','veryfast','-crf','21','-pix_fmt','yuv420p','-t',String(visualDuration),'-movflags','+faststart',output);
-  update(92,'Mezclando voz, música, efectos y subtítulos');await run('ffmpeg',args);
-  const result={name:basename(output),duration:visualDuration,width,height,createdAt:new Date().toISOString(),preview};if(preview)p.review={...result,signature:renderSignature(p)};else{p.exports=p.exports||[];p.exports.unshift(result);}save(p);return result;
-}
-
 async function exportProject(p,update,requestElapsedMs=0){
   const startedAt=performance.now();
   const result=await renderWithRemotion(p,dirOf(p),update);
@@ -440,7 +349,7 @@ export async function studioRequest(req,res,url){
     if(req.method==='GET'&&path==='/api/studio/templates')return json(res,200,existsSync(TEMPLATE_STORE)?JSON.parse(readFileSync(TEMPLATE_STORE,'utf8')):[]),true;
     if(req.method==='PUT'&&path==='/api/studio/templates'){const items=await readJson(req);if(!Array.isArray(items)||items.length>100)throw Error('Lista de plantillas inválida');writeFileSync(TEMPLATE_STORE,JSON.stringify(items.map(item=>({id:clean(item.id,80),name:clean(item.name,80),type:clean(item.type,30),position:clean(item.position,30),font:clean(item.font,50),size:Number(item.size)||6,color:clean(item.color,20),accent:clean(item.accent,20),background:Number(item.background)||0,animation:clean(item.animation,20)})),null,2));return json(res,200,{saved:items.length}),true;}
     if(req.method==='GET'&&path==='/api/studio/projects')return json(res,200,[...projects.values()].map(p=>({id:p.id,title:p.title,updatedAt:p.updatedAt,scenes:p.scenes?.length||0}))),true;
-    if(req.method==='POST'&&path==='/api/studio/projects'){const input=await readJson(req),id=randomUUID(),folder=join(DATA,id);mkdirSync(join(folder,'assets'),{recursive:true});mkdirSync(join(folder,'renders'),{recursive:true});const p={id,title:clean(input.title||'Nuevo proyecto'),createdAt:new Date().toISOString(),assets:[],cues:[],sourceCues:[],subtitleCues:[],textLayers:[],wordsJson:null,rawChapters:null,rawSearchTerms:null,youtubeSources:null,chapterGrouping:{},chapterValidationError:'',chapters:[],scenes:[],settings:{ratio:'16:9',quality:'720p',exportQuality:'high',captions:false,captionStyle:'cine',captionColor:'yellow',musicVolume:20,transitionSequence:['Corte'],effectSequence:[],transitionDuration:.45,fit:'blur',imageFit:'blur',videoFit:'fill',blur:20,blurOpacity:0,motion:'static',zoomPercent:10,sceneMode:'srt'},exports:[]};projects.set(id,p);save(p);return json(res,200,p),true;}
+    if(req.method==='POST'&&path==='/api/studio/projects'){const input=await readJson(req),id=randomUUID(),folder=join(DATA,id);mkdirSync(join(folder,'assets'),{recursive:true});mkdirSync(join(folder,'renders'),{recursive:true});const p={id,title:clean(input.title||'Nuevo proyecto'),createdAt:new Date().toISOString(),assets:[],cues:[],sourceCues:[],subtitleCues:[],textLayers:[],wordsJson:null,rawChapters:null,rawSearchTerms:null,youtubeSources:null,chapterGrouping:{},chapterValidationError:'',chapters:[],scenes:[],settings:{ratio:'16:9',quality:'720p',exportQuality:'high',captions:false,captionStyle:'cine',captionColor:'yellow',musicVolume:20,transitionSequence:['remotion:none'],effectSequence:[],transitionDuration:.45,fit:'blur',imageFit:'blur',videoFit:'fill',blur:20,blurOpacity:0,motion:'static',zoomPercent:10,sceneMode:'srt'},exports:[]};projects.set(id,p);save(p);return json(res,200,p),true;}
     const m=path.match(/^\/api\/studio\/projects\/([a-f0-9-]+)(?:\/(.*))?$/);if(!m)return json(res,404,{error:'Ruta no encontrada'}),true;
     const p=projects.get(m[1]);if(!p)return json(res,404,{error:'Proyecto no encontrado'}),true;const action=m[2]||'';
     if(req.method==='GET'&&!action)return json(res,200,p),true;
@@ -480,7 +389,7 @@ export async function studioRequest(req,res,url){
     if(req.method==='GET'&&action.startsWith('assets/')){const found=asset(p,action.slice(7));if(!found)return json(res,404,{error:'Asset no encontrado'}),true;if(url.searchParams.get('renderProxy')==='1'){if(found.type!=='video')return json(res,404,{error:'Video no encontrado'}),true;streamFile(req,res,join(dirOf(p),'renders','compatible',`${found.id}.mp4`),'video/mp4');return true;}if(url.searchParams.get('renderImage')==='1'){if(found.type!=='image')return json(res,404,{error:'Imagen no encontrada'}),true;streamFile(req,res,join(dirOf(p),'renders','images',`${found.id}.png`),'image/png');return true;}const mime={'.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp','.gif':'image/gif','.mp4':'video/mp4','.mov':'video/quicktime','.mkv':'video/x-matroska','.webm':'video/webm','.wav':'audio/wav','.mp3':'audio/mpeg','.m4a':'audio/mp4','.aac':'audio/aac'};streamFile(req,res,assetPath(p,found.id),mime[extname(found.file).toLowerCase()]||'application/octet-stream');return true;}
     if(req.method==='GET'&&action==='review'){const review=p.review,ready=!!(review?.signature===renderSignature(p)&&existsSync(join(dirOf(p),'renders',review.name)));return json(res,200,{ready,result:ready?review:null}),true;}
     if(req.method==='POST'&&action==='render'){const input=await readJson(req),elapsed=Number(input.requestElapsedMs),requestElapsedMs=Number.isFinite(elapsed)?Math.max(0,Math.min(300000,elapsed)):0;const t=task(p,'render',update=>exportProject(p,update,requestElapsedMs));return json(res,202,t),true;}
-    if(req.method==='POST'&&action==='preview'){const t=task(p,'preview',update=>renderProject(p,update,{preview:true}));return json(res,202,t),true;}
+    if(req.method==='POST'&&action==='preview'){const t=task(p,'preview',async update=>{const result=await renderWithRemotion(p,dirOf(p),update);p.review={...result,preview:true,signature:renderSignature(p)};save(p);return p.review;});return json(res,202,t),true;}
     if(req.method==='POST'&&action==='capcut'){const t=task(p,'capcut',update=>exportCapCut(p,dirOf(p),update));return json(res,202,t),true;}
     if(req.method==='POST'&&action==='adjust-audio'){const input=await readJson(req),t=task(p,'audio',update=>adjustAudio(p,input,update));return json(res,202,t),true;}
     if(req.method==='POST'&&action==='sources'){const input=await readJson(req),t=task(p,'sources',update=>downloadChapters(p,input,update));return json(res,202,t),true;}

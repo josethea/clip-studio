@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useMemo} from 'react';
 import {AbsoluteFill, Html5Audio, Html5Video, Img, OffthreadVideo, Sequence, useCurrentFrame, useVideoConfig} from 'remotion';
 import {sceneTransitionFramePlan} from './transition-timing.mjs';
 import {TransitionSeries, linearTiming} from '@remotion/transitions';
@@ -81,8 +81,9 @@ function TextLayer({layer,time,height}){
   return <div style={style}>{content}</div>;
 }
 export function StudioComposition({project}){
-  const frame=useCurrentFrame(),{fps,width,height,durationInFrames}=useVideoConfig(),time=frame/fps,scenes=project.scenes||[],assets=Object.fromEntries((project.assets||[]).map(a=>[a.id,a])),settings=project.settings||{};
-  const sceneFrames=sceneTransitionFramePlan(scenes,fps,durationInFrames);
+  const frame=useCurrentFrame(),{fps,width,height,durationInFrames}=useVideoConfig(),time=frame/fps,scenes=project.scenes||[],settings=project.settings||{};
+  const assets=useMemo(()=>Object.fromEntries((project.assets||[]).map(a=>[a.id,a])),[project.assets]);
+  const sceneFrames=useMemo(()=>sceneTransitionFramePlan(scenes,fps,durationInFrames),[scenes,fps,durationInFrames]);
   const cues=project.subtitleCues?.length?project.subtitleCues:project.cues||[];
   const caption=settings.captions===false?null:cues.find(c=>!c.hidden&&time>=c.start&&time<c.end);
   const narration=assets[project.narrationId],music=assets[project.musicId];

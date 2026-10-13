@@ -18,23 +18,11 @@ import {crossZoom} from '@remotion/transitions/cross-zoom';
 import {swap} from '@remotion/transitions/swap';
 import {blurSlide} from '@remotion/transitions/blur-slide';
 
-// Old project names remain valid; their nearest native Remotion presentation is used.
-const legacy={
-  'Left':'remotion:slide:right','Pick Another':'remotion:fade',
-  'Zoom Swipe':'remotion:zoom-blur','Dive & Bounce':'remotion:iris',
-  'Snapshot Glam':'remotion:dreamy-zoom','Pull & Reveal':'remotion:wipe:right',
-  'Fundido':'remotion:fade','Deslizar derecha':'remotion:slide:left',
-  'Deslizar arriba':'remotion:slide:bottom','Deslizar abajo':'remotion:slide:top',
-  'Barrido izquierda':'remotion:wipe:right','Barrido derecha':'remotion:wipe:left',
-  'Círculo cierre':'remotion:iris','Disolver':'remotion:dissolve',
-  'Pixelado':'remotion:dissolve','Blur':'remotion:linear-blur',
-  'Flash':'remotion:push-cut'
-};
 const cache=new Map();
 
 export function transitionPresentation(name,width,height){
-  if(name==='Corte')return null;
-  const id=legacy[name]||name,key=`${id}:${width}x${height}`;
+  if(name==='remotion:none')return null;
+  const id=name,key=`${id}:${width}x${height}`;
   if(cache.has(key))return cache.get(key);
   const [,kind,direction]=id.split(':');
   let presentation;
@@ -58,7 +46,7 @@ export function transitionPresentation(name,width,height){
     case 'cross-zoom':presentation=crossZoom({});break;
     case 'swap':presentation=swap({});break;
     case 'blur-slide':presentation=blurSlide({direction:`from-${direction}`});break;
-    default:presentation=fade();
+    default:return null;
   }
   cache.set(key,presentation);
   return presentation;
