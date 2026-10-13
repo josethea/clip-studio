@@ -123,8 +123,10 @@ async function renderProject(p,update,{preview=false}={}){
   const result={name:basename(output),duration:visualDuration,width,height,createdAt:new Date().toISOString(),preview};if(preview)p.review={...result,signature:renderSignature(p)};else{p.exports=p.exports||[];p.exports.unshift(result);}save(p);return result;
 }
 
-async function exportProject(p,update){
+async function exportProject(p,update,requestElapsedMs=0){
+  const startedAt=performance.now();
   const result=await renderWithRemotion(p,dirOf(p),update);
+  result.renderDurationMs=Math.round(performance.now()-startedAt+requestElapsedMs);
   p.exports=p.exports||[];p.exports.unshift(result);save(p);return result;
 }
 
@@ -477,7 +479,7 @@ export async function studioRequest(req,res,url){
     }
     if(req.method==='GET'&&action.startsWith('assets/')){const found=asset(p,action.slice(7));if(!found)return json(res,404,{error:'Asset no encontrado'}),true;if(url.searchParams.get('renderProxy')==='1'){if(found.type!=='video')return json(res,404,{error:'Video no encontrado'}),true;streamFile(req,res,join(dirOf(p),'renders','compatible',`${found.id}.mp4`),'video/mp4');return true;}if(url.searchParams.get('renderImage')==='1'){if(found.type!=='image')return json(res,404,{error:'Imagen no encontrada'}),true;streamFile(req,res,join(dirOf(p),'renders','images',`${found.id}.png`),'image/png');return true;}const mime={'.jpg':'image/jpeg','.jpeg':'image/jpeg','.png':'image/png','.webp':'image/webp','.gif':'image/gif','.mp4':'video/mp4','.mov':'video/quicktime','.mkv':'video/x-matroska','.webm':'video/webm','.wav':'audio/wav','.mp3':'audio/mpeg','.m4a':'audio/mp4','.aac':'audio/aac'};streamFile(req,res,assetPath(p,found.id),mime[extname(found.file).toLowerCase()]||'application/octet-stream');return true;}
     if(req.method==='GET'&&action==='review'){const review=p.review,ready=!!(review?.signature===renderSignature(p)&&existsSync(join(dirOf(p),'renders',review.name)));return json(res,200,{ready,result:ready?review:null}),true;}
-    if(req.method==='POST'&&action==='render'){const t=task(p,'render',update=>exportProject(p,update));return json(res,202,t),true;}
+    if(req.method==='POST'&&action==='render'){const input=await readJson(req),elapsed=Number(input.requestElapsedMs),requestElapsedMs=Number.isFinite(elapsed)?Math.max(0,Math.min(300000,elapsed)):0;const t=task(p,'render',update=>exportProject(p,update,requestElapsedMs));return json(res,202,t),true;}
     if(req.method==='POST'&&action==='preview'){const t=task(p,'preview',update=>renderProject(p,update,{preview:true}));return json(res,202,t),true;}
     if(req.method==='POST'&&action==='capcut'){const t=task(p,'capcut',update=>exportCapCut(p,dirOf(p),update));return json(res,202,t),true;}
     if(req.method==='POST'&&action==='adjust-audio'){const input=await readJson(req),t=task(p,'audio',update=>adjustAudio(p,input,update));return json(res,202,t),true;}
