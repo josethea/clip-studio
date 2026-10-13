@@ -13,7 +13,7 @@ try{
     console.log(missing.length?`Bibliotecas faltantes:\n${missing.join('\n')}`:'Bibliotecas compartidas: todas encontradas');
   }
   const browser=await openBrowser('chrome',{browserExecutable:executable,logLevel:'verbose'});
-  await browser.close();
+  await browser.close({silent:true});
   console.log('Chrome inició y cerró correctamente.');
 }catch(error){
   console.error('Chrome no pudo iniciarse. Error completo:\n',error);
