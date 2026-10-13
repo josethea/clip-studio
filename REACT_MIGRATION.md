@@ -7,7 +7,7 @@ La interfaz se migrará por módulos. La composición de Remotion ya usa React y
 - Redux Toolkit y React Redux para el estado de los componentes nuevos.
 - Componentes React para el selector de transiciones y el historial de exportaciones.
 - Solo opciones de transición `remotion:*`; `remotion:none` representa un corte sin efecto.
-- Nombres antiguos de proyectos guardados convertidos a `remotion:fade` o `remotion:none` al abrirlos y también al preparar el render.
+- Nombres antiguos de proyectos guardados convertidos a `remotion:slide:bottom` o `remotion:none` al abrirlos y también al preparar el render. `Slide desde abajo` fue contrastado con un MP4 exportado sin fotogramas negros en los cortes.
 - Eliminada la ruta antigua de render visual con FFmpeg para la vista previa de archivo.
 
 ## Fase 2: proyecto, transcript y medios

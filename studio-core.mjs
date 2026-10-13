@@ -17,7 +17,7 @@ export const transitions=['remotion:none',...remotionTransitionOptions.map(([id]
 export function normalizeTransition(value){
   if(transitions.includes(value))return value;
   if(value==='Corte')return 'remotion:none';
-  return legacyTransitions.includes(value)?'remotion:fade':'remotion:none';
+  return legacyTransitions.includes(value)?'remotion:slide:bottom':'remotion:none';
 }
 export function migrateProjectTransitions(project){
   const settings=project.settings||{};
