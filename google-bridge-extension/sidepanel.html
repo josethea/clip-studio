@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Chapter Image Collector</title>
+    <link rel="stylesheet" href="sidepanel.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">AUTOMATED IMAGE WORKFLOW</p>
+        <h1>Chapter Collector</h1>
+      </div>
+      <span id="statusBadge" class="badge idle">Listo</span>
+    </header>
+
+    <nav class="tabbar" aria-label="Secciones de la extensión">
+      <button class="tab-button active" type="button" data-tab="execution" aria-selected="true">Ejecución</button>
+      <button class="tab-button" type="button" data-tab="chapters" aria-selected="false">Capítulos / términos de búsqueda</button>
+      <button class="tab-button" type="button" data-tab="setup" aria-selected="false">Configuración</button>
+    </nav>
+
+    <main>
+      <section class="tab-panel active" data-panel="execution">
+        <section class="card empty-state" id="executionEmpty">
+          <span class="empty-icon">▶</span>
+          <h2>Prepara la operación</h2>
+          <p>Importa capítulos o términos de búsqueda para habilitar la ejecución automática.</p>
+          <button class="secondary" type="button" data-go-tab="chapters">Ir a Capítulos / términos</button>
+        </section>
+
+        <section class="card hidden" id="runSection">
+          <div class="section-heading">
+            <div>
+              <span class="step">1</span>
+              <h2>Ejecución automática</h2>
+            </div>
+            <span id="overallCount" class="muted">0 / 0</span>
+          </div>
+
+          <div class="progress-shell"><div id="progressBar" class="progress-bar"></div></div>
+          <p id="currentTask" class="current-task">Preparado para comenzar.</p>
+
+          <div id="scanVisualizer" class="scan-visualizer hidden">
+            <div class="scan-toolbar">
+              <span><strong id="foundCount">0</strong> found</span>
+              <span><strong id="selectedCount">0</strong>/<strong id="selectionGoal">0</strong> selected</span>
+            </div>
+            <div id="activeFilters" class="active-filters"></div>
+            <div id="liveGallery" class="live-gallery"></div>
+            <div id="scanOverlay" class="scan-overlay">
+              <strong id="scanOverlayText">Scanning page…</strong>
+              <span id="scanOverlayDetail">Preparing Google Images</span>
+              <div class="scan-progress"><div id="scanProgressBar"></div></div>
+            </div>
+          </div>
+
+          <div id="runLog" class="run-log" aria-live="polite"></div>
+
+          <div class="button-row">
+            <button id="startButton" class="primary" type="button">Iniciar operación</button>
+            <button id="pauseButton" class="secondary hidden" type="button">Pausar</button>
+            <button id="captchaRetryButton" class="secondary captcha-retry hidden" type="button">No veo CAPTCHA · Reintentar</button>
+            <button id="cancelButton" class="danger hidden" type="button">Cancelar</button>
+          </div>
+          <p class="fine-print">Mantén abierto este panel durante la operación. Si Google solicita verificación humana, el proceso esperará y continuará después de resolverla.</p>
+        </section>
+
+        <section class="card success-card hidden" id="downloadSection">
+          <span class="success-icon">✓</span>
+          <h2>Recolección terminada</h2>
+          <p id="downloadSummary"></p>
+          <button id="downloadButton" class="primary full" type="button">Descargar ZIP por capítulos</button>
+          <button id="downloadFailuresButton" class="secondary full report-button" type="button">Descargar JSON de fallos</button>
+        </section>
+      </section>
+
+      <section class="tab-panel" data-panel="chapters">
+      <section class="card" id="importSection">
+        <div class="section-heading">
+          <div>
+            <span class="step">1</span>
+            <h2>Importar capítulos o términos</h2>
+          </div>
+          <button id="clearButton" class="text-button" type="button">Limpiar</button>
+        </div>
+        <label class="drop-zone" id="dropZone">
+          <input id="jsonFile" type="file" accept="application/json,.json,.txt">
+          <span class="drop-icon">{ }</span>
+          <strong>Selecciona o arrastra tu JSON</strong>
+          <small>Capítulos: chapter + searchTerm[] · Términos: id + searchTerm</small>
+        </label>
+        <textarea id="jsonText" rows="5" spellcheck="false" placeholder='Pega aquí el JSON de capítulos o términos de búsqueda…'></textarea>
+        <button id="parseButton" class="primary full" type="button">Guardar JSON</button>
+        <p id="importMessage" class="message" aria-live="polite"></p>
+      </section>
+
+      <section class="card hidden" id="chaptersSection">
+        <div class="section-heading">
+          <div>
+            <span class="step">✓</span>
+            <h2 id="collectionHeading">Imágenes por capítulo</h2>
+          </div>
+          <button id="editImportButton" class="text-button" type="button">Cambiar JSON</button>
+        </div>
+        <p id="chapterSummary" class="chapter-summary muted"></p>
+        <div id="batchRow" class="batch-row">
+          <label>
+            Aplicar cantidad a todos
+            <input id="bulkCount" type="number" min="1" step="1" placeholder="Ej. 20">
+          </label>
+          <button id="applyBulkButton" class="secondary" type="button">Aplicar</button>
+        </div>
+        <div id="chapterList" class="chapter-list"></div>
+      </section>
+      </section>
+
+      <section class="tab-panel" data-panel="setup">
+      <section class="card" id="filtersSection">
+        <div class="section-heading">
+          <div>
+            <span class="step">3</span>
+            <h2>Configuración global</h2>
+          </div>
+          <button id="resetFiltersButton" class="text-button" type="button">Any en todo</button>
+        </div>
+
+        <div class="filter-grid">
+          <label>Size
+            <select id="sizeFilter">
+              <option value="any">Any</option>
+              <option value="small">Small (≥ 400 px)</option>
+              <option value="medium">Medium (≥ 800 px)</option>
+              <option value="large">Large (≥ 1600 px)</option>
+              <option value="xlarge">X-Large (≥ 2560 px)</option>
+              <option value="custom">Custom…</option>
+            </select>
+          </label>
+          <label>Type
+            <select id="typeFilter">
+              <option value="any">Any</option>
+              <option value="jpeg">JPG / JPEG</option>
+              <option value="png">PNG</option>
+              <option value="webp">WebP</option>
+              <option value="gif">GIF</option>
+              <option value="svg">SVG</option>
+            </select>
+          </label>
+          <label>Layout
+            <select id="layoutFilter">
+              <option value="any">Any</option>
+              <option value="landscape">Landscape</option>
+              <option value="portrait">Portrait</option>
+              <option value="square">Square</option>
+            </select>
+          </label>
+          <label>URL
+            <select id="urlFilterMode">
+              <option value="any">Any</option>
+              <option value="include">Contains…</option>
+              <option value="exclude">Does not contain…</option>
+            </select>
+          </label>
+        </div>
+
+        <div id="customSizeFields" class="inline-fields hidden">
+          <label>Min. width <input id="minWidth" type="number" min="1" value="1"></label>
+          <label>Min. height <input id="minHeight" type="number" min="1" value="1"></label>
+        </div>
+        <label id="urlTextLabel" class="hidden">Texto de URL
+          <input id="urlFilterText" type="text" placeholder="dominio.com o palabra">
+        </label>
+
+        <div class="sort-row">
+          <label>Sort
+            <select id="sortFilter">
+              <option value="pixels">Pixel size</option>
+              <option value="position">Position in results</option>
+              <option value="fileSize">File size</option>
+              <option value="url">URL</option>
+            </select>
+          </label>
+          <label>Candidatos por imagen
+            <select id="candidateMultiplier">
+              <option value="3">3×</option>
+              <option value="5" selected>5×</option>
+              <option value="8">8×</option>
+            </select>
+          </label>
+        </div>
+
+        <label class="check-row">
+          <input id="deduplicate" type="checkbox" checked>
+          <span>Eliminar imágenes duplicadas por contenido</span>
+        </label>
+        <label class="check-row">
+          <input id="ignoreTextHeavy" type="checkbox">
+          <span>Ignorar imágenes con demasiado texto o aspecto de infografía</span>
+        </label>
+        <p class="setting-note">Permite rótulos breves, pero rechaza imágenes con numerosos bloques de texto, leyendas o anotaciones.</p>
+        <label class="check-row">
+          <input id="safeSearch" type="checkbox" checked>
+          <span>Usar SafeSearch</span>
+        </label>
+      </section>
+      </section>
+    </main>
+
+    <p style="padding:12px"><button id="openClipBridge" type="button">Conectar con Clip Studio</button></p>
+    <script src="sidepanel.js"></script>
+    <script src="open-bridge.js"></script>
+  </body>
+</html>

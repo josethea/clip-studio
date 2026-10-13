@@ -1,0 +1,19 @@
+[
+  {
+    "chapter": "Example Chapter One",
+    "startText": "Optional start marker",
+    "endText": "Optional end marker",
+    "imageCount": 8,
+    "searchTerm": [
+      "first visual search term",
+      "second visual search term"
+    ]
+  },
+  {
+    "chapter": "Example Chapter Two",
+    "imageCount": 5,
+    "searchTerm": [
+      "another visual search term"
+    ]
+  }
+]

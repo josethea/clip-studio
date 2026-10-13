@@ -1,0 +1,42 @@
+{
+  "manifest_version": 3,
+  "name": "Chapter Image Collector + Clip Studio",
+  "version": "0.11.1",
+  "description": "Automatiza búsquedas de Google Imágenes desde capítulos o términos individuales y exporta los resultados en ZIP.",
+  "permissions": [
+    "activeTab",
+    "downloads",
+    "sidePanel",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1/*",
+    "http://localhost/*",
+    "https://www.google.com/*"
+  ],
+  "optional_host_permissions": [
+    "http://*/*",
+    "https://*/*"
+  ],
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "action": {
+    "default_title": "Chapter Image Collector"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.google.com/*"
+      ],
+      "js": [
+        "google-scanner.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
