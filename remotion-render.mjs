@@ -9,6 +9,7 @@ import {prepareRemotionProject} from './remotion-data.mjs';
 import {exportEncodingOptions} from './export-quality.mjs';
 import {preparePlayableVideoAssets} from './render-media-preflight.mjs';
 import {prepareRenderImages} from './render-image-preflight.mjs';
+import {browserLaunchError} from './remotion-browser-diagnostics.mjs';
 
 const ROOT=resolve(import.meta.dirname),execute=promisify(execFile),CHUNK_FRAMES=1800;
 let bundlePromise;
@@ -119,10 +120,8 @@ export async function renderWithRemotion(project,folder,update){
     rmSync(checkpoint,{recursive:true,force:true});
   }catch(error){
     rmSync(output,{force:true});
-    const detail=String(error?.message||error);
-    if(/Failed to launch the browser process|mach_port_rendezvous|BootstrapLookupMessage|Permission denied \(1100\)/i.test(detail)){
-      throw Error('Remotion no pudo iniciar Chrome para exportar desde esta sesión restringida de Codex. Cierra el servidor actual y abre «Iniciar Clip Studio.command» desde Finder; después vuelve a exportar en la dirección que muestra Terminal. El proyecto y sus medios siguen guardados.');
-    }
+    const message=browserLaunchError(error);
+    if(message){console.error('Error completo al iniciar Chrome para exportar:',error);throw Error(message);}
     throw error;
   }
   update(99,'MP4 listo');

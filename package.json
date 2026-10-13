@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build:preview": "node build-preview.mjs",
+    "check:browser": "node check-browser.mjs",
     "start": "node build-preview.mjs && node server.mjs"
   },
   "engines": {
