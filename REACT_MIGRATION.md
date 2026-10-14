@@ -36,7 +36,8 @@ La interfaz se migrará por módulos. La composición de Remotion ya usa React y
 
 - La pantalla de Exportación usa componentes React para validación, resolución de salida, progreso, enlaces de descarga, historial y paquete CapCut. La validación está separada en `export-view.mjs`; las tareas de render y CapCut conservan las llamadas de API existentes.
 - El panel lateral de Renombrar usa React para mostrar el conteo y habilitar la acción. La selección de carpeta y el progreso de archivos siguen usando la API del navegador y el diálogo de progreso existente.
-- Pendiente: migrar Gemini, Claves y Prompts de la barra lateral, además de otras operaciones del editor y Medios que todavía dependen del controlador.
+- Gemini, Claves y Prompts de la barra lateral usan componentes React. Las claves viven solo en memoria de la sesión, compartidas con las búsquedas manuales y automáticas mediante `credential-session.mjs`; el JSON de beats, el campo elegido y el resultado formateado son estado local del componente.
+- Pendiente: migrar otras operaciones del editor y Medios que todavía dependen del controlador.
 - Retirar `public/studio.js` y los selectores DOM directos después de pasar las pruebas de flujo completo.
 - Comparar vista previa y MP4 en cortes/transiciones, textos, subtítulos, imagen y video.
 - Medir exportaciones de 5 y 30 minutos en el VPS antes de ajustar concurrencia de Remotion.

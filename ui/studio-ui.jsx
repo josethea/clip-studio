@@ -12,6 +12,7 @@ import {TextInspector,SubtitleInspector,MultiInspector} from './editor-text.jsx'
 import {GlobalControls,FormatControls,PreviewControls} from './editor-controls.jsx';
 import {ExportPage} from './export.jsx';
 import {RenamePanel} from './rename.jsx';
+import {GeminiPanel,KeysPanel,PromptsPanel} from './sidebar-tools.jsx';
 
 const uiSlice=createSlice({
   name:'studioUi',
@@ -68,6 +69,11 @@ export function patchExportProgress(patch){store.dispatch(uiSlice.actions.patchE
 export function renderRenamePanel(view,actions){
   store.dispatch(uiSlice.actions.showRename(view));
   if(!roots.has('rename-app'))root('rename-app').render(<Provider store={store}><RenamePanel actions={actions}/></Provider>);
+}
+export function mountSidebarTools(actions,origin){
+  root('gemini-app').render(<GeminiPanel actions={actions}/>);
+  root('keys-app').render(<KeysPanel origin={origin}/>);
+  root('prompts-app').render(<PromptsPanel actions={actions}/>);
 }
 
 export function renderTranscriptPanel(info,actions){
