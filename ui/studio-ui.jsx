@@ -3,13 +3,18 @@ import {createRoot} from 'react-dom/client';
 import {Provider, useSelector} from 'react-redux';
 import {configureStore, createSlice} from '@reduxjs/toolkit';
 import {transitions, transitionLabels} from '../studio-core.mjs';
+import {TranscriptApp} from './transcript.jsx';
+import {ProjectApp} from './project.jsx';
 
 const uiSlice=createSlice({
   name:'studioUi',
-  initialState:{transitionSequence:['remotion:none'],projectId:null,projectTitle:'',exports:[]},
+  initialState:{transitionSequence:['remotion:none'],projectId:null,projectTitle:'',exports:[],transcript:null,project:null,projects:[]},
   reducers:{
     showTransitions(state,action){state.transitionSequence=action.payload;},
-    showExports(state,action){Object.assign(state,action.payload);}
+    showExports(state,action){Object.assign(state,action.payload);},
+    showTranscript(state,action){state.transcript=action.payload;},
+    showProject(state,action){state.project=action.payload;},
+    showProjects(state,action){state.projects=action.payload;}
   }
 });
 const store=configureStore({reducer:{studioUi:uiSlice.reducer}});
@@ -47,4 +52,18 @@ export function renderTransitionPicker(sequence,onToggle){
 export function renderExportHistory(project){
   store.dispatch(uiSlice.actions.showExports({projectId:project.id,projectTitle:project.title,exports:[...(project.exports||[])]}));
   root('export-list').render(<Provider store={store}><ExportHistory/></Provider>);
+}
+
+export function renderTranscriptPanel(info,actions){
+  store.dispatch(uiSlice.actions.showTranscript(info));
+  root('transcript-app').render(<Provider store={store}><TranscriptApp actions={actions}/></Provider>);
+}
+
+export function renderProjectPanel(info,actions){
+  store.dispatch(uiSlice.actions.showProject(info));
+  root('project-app').render(<Provider store={store}><ProjectApp actions={actions}/></Provider>);
+}
+
+export function renderProjectOptions(projects){
+  store.dispatch(uiSlice.actions.showProjects(projects.slice().sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))));
 }

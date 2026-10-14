@@ -12,6 +12,8 @@ La interfaz se migrará por módulos. La composición de Remotion ya usa React y
 
 ## Fase 2: proyecto, transcript y medios
 
+- Proyecto y Transcript migrados a componentes React. Los formularios y resultados temporales viven en React; listas y resúmenes se sincronizan con Redux Toolkit. La conversión SRT y el guardado siguen usando las funciones existentes para conservar el formato de los proyectos.
+- Pendiente en esta fase: Medios y consolidar la edición del proyecto en un único estado compartido.
 - Componentes por pestaña y subcomponentes para carga, validación, storyboard y buscadores.
 - Una sola fuente de verdad para proyecto, selección, búsqueda y progreso; separar estado persistido del proyecto de estado temporal de la interfaz.
 - Cargar medios y páginas a demanda para evitar insertar cientos de tarjetas y miniaturas a la vez.
