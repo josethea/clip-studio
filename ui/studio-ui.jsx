@@ -6,12 +6,12 @@ import {configureStore, createSlice} from '@reduxjs/toolkit';
 import {transitions, transitionLabels} from '../studio-core.mjs';
 import {TranscriptApp} from './transcript.jsx';
 import {ProjectApp} from './project.jsx';
-import {AssetLibrary, ChapterGrouping, AutofillEntries, MissingMediaSummary, MediaBoard} from './media.jsx';
+import {AssetLibrary, ChapterGrouping, AutofillEntries, MissingMediaSummary, MediaBoard, MediaPagination} from './media.jsx';
 import {MediaPage} from './media-page.jsx';
 
 const uiSlice=createSlice({
   name:'studioUi',
-  initialState:{transitionSequence:['remotion:none'],projectId:null,projectTitle:'',exports:[],transcript:null,project:null,projects:[],mediaAssets:null,mediaChapters:null,autofillEntries:[],mediaMissing:null,mediaBoard:null,mediaStock:null},
+  initialState:{transitionSequence:['remotion:none'],projectId:null,projectTitle:'',exports:[],transcript:null,project:null,projects:[],mediaAssets:null,mediaChapters:null,autofillEntries:[],mediaMissing:null,mediaBoard:null,mediaStock:null,mediaPagination:{assets:null,media:null},mediaSession:{activeScene:0,provider:'storyblocks',type:'videos',query:'',searched:false,missingOnly:false,pexelsPage:0,storyblocksPage:0,googlePage:0}},
   reducers:{
     showTransitions(state,action){state.transitionSequence=action.payload;},
     showExports(state,action){Object.assign(state,action.payload);},
@@ -23,7 +23,9 @@ const uiSlice=createSlice({
     showAutofillEntries(state,action){state.autofillEntries=action.payload;},
     showMediaMissing(state,action){state.mediaMissing=action.payload;},
     showMediaBoard(state,action){state.mediaBoard=action.payload;},
-    showMediaStock(state,action){state.mediaStock=action.payload;}
+    showMediaStock(state,action){state.mediaStock=action.payload;},
+    showMediaPagination(state,action){state.mediaPagination[action.payload.kind]=action.payload.view;},
+    patchMediaSession(state,action){Object.assign(state.mediaSession,action.payload);}
   }
 });
 const store=configureStore({reducer:{studioUi:uiSlice.reducer}});
@@ -77,14 +79,20 @@ export function renderProjectOptions(projects){
   store.dispatch(uiSlice.actions.showProjects(projects.slice().sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))));
 }
 
-function renderMediaIsland(id,action,payload,Component){
+function renderMediaIsland(id,action,payload,Component,actions){
   store.dispatch(action(payload));
-  root(id).render(<Provider store={store}><Component/></Provider>);
+  root(id).render(<Provider store={store}><Component actions={actions}/></Provider>);
 }
-export const renderAssetLibrary=view=>renderMediaIsland('asset-list',uiSlice.actions.showMediaAssets,view,AssetLibrary);
-export const renderChapterGroups=view=>renderMediaIsland('chapter-grouping',uiSlice.actions.showMediaChapters,view,ChapterGrouping);
-export const renderAutofillSequence=entries=>renderMediaIsland('autofill-sequence',uiSlice.actions.showAutofillEntries,entries,AutofillEntries);
-export const renderMissingSummary=view=>renderMediaIsland('media-missing-summary',uiSlice.actions.showMediaMissing,view,MissingMediaSummary);
-export const renderStoryboard=view=>renderMediaIsland('media-board',uiSlice.actions.showMediaBoard,view,MediaBoard);
+export const renderAssetLibrary=(view,actions)=>renderMediaIsland('asset-list',uiSlice.actions.showMediaAssets,view,AssetLibrary,actions);
+export const renderChapterGroups=(view,actions)=>renderMediaIsland('chapter-grouping',uiSlice.actions.showMediaChapters,view,ChapterGrouping,actions);
+export const renderAutofillSequence=(entries,actions)=>renderMediaIsland('autofill-sequence',uiSlice.actions.showAutofillEntries,entries,AutofillEntries,actions);
+export const renderMissingSummary=(view,actions)=>renderMediaIsland('media-missing-summary',uiSlice.actions.showMediaMissing,view,MissingMediaSummary,actions);
+export const renderStoryboard=(view,actions)=>renderMediaIsland('media-board',uiSlice.actions.showMediaBoard,view,MediaBoard,actions);
+export function renderMediaPagination(kind,view,actions){
+  store.dispatch(uiSlice.actions.showMediaPagination({kind,view}));
+  root(kind==='assets'?'asset-pagination':'media-pagination').render(<Provider store={store}><MediaPagination kind={kind} actions={actions}/></Provider>);
+}
 export function renderStockCards(view){store.dispatch(uiSlice.actions.showMediaStock(view));}
 export function mountMediaPage(){flushSync(()=>root('assets').render(<MediaPage/>));}
+export function getMediaSession(){return store.getState().studioUi.mediaSession;}
+export function patchMediaSession(patch){store.dispatch(uiSlice.actions.patchMediaSession(patch));}
