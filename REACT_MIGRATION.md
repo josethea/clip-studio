@@ -17,7 +17,8 @@ La interfaz se migrará por módulos. La composición de Remotion ya usa React y
 - Las tarjetas de Biblioteca y Storyboard conservan la paginación de 15 elementos; los resultados de búsqueda muestran hasta cinco por página.
 - La interacción de las tarjetas (selección, búsqueda, paginación, asignación, capítulos y bloques faltantes) sale de callbacks React. Redux Toolkit guarda el bloque activo, proveedor, tipo, término y páginas de resultados; un puente conserva temporalmente las operaciones de API del controlador anterior.
 - Las peticiones de búsqueda, importación y autocompletado de Pexels, Storyblocks y Google Images pasan por `media-service.mjs`. El servicio lee las claves de la sesión justo antes de cada petición y el controlador sigue coordinando el estado de la pantalla.
-- Pendiente: retirar el puente entre el estado de Medios en Redux y el controlador al migrar sus acciones y el resto del estado editable.
+- Retirado el puente `Object.defineProperty` entre el controlador y Redux: el controlador lee la sesión de Medios con `getMediaSession()` y la cambia con `patchMediaSession()`. Las listas de resultados, los lotes de Pexels y Storyblocks y el seguimiento de trabajos de Google viven en `media-search.mjs`, que también arma la vista de las tarjetas de resultados. Al cambiar de escena o de página se descartan las respuestas de búsquedas anteriores, y mientras se descarga el siguiente lote se ignoran los clics de paginación.
+- Pendiente: llevar a componentes las acciones de Medios que todavía tocan el DOM desde el controlador (secuencia automática, escena de destino de la Biblioteca, fuentes de YouTube) y el selector de material del editor.
 
 ## Fase 3: editor
 

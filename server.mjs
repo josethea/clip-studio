@@ -15,7 +15,7 @@ const server=http.createServer(async(req,res)=>{
     const url=new URL(req.url,`http://127.0.0.1:${PORT}`);
     if(await studioRequest(req,res,url))return;
     if(req.method!=='GET')return error(res,404,'Ruta no encontrada');
-    const name=files.get(url.pathname),font=/^\/fonts\/[a-z0-9-]+\.ttf$/.test(url.pathname),file=font?join(PUBLIC,url.pathname):['/studio-core.mjs','/reference-transcript.mjs','/remotion-data.mjs','/editor-session.mjs','/export-view.mjs','/credential-session.mjs','/media-service.mjs'].includes(url.pathname)?join(ROOT,url.pathname.slice(1)):name?join(PUBLIC,name):null;
+    const name=files.get(url.pathname),font=/^\/fonts\/[a-z0-9-]+\.ttf$/.test(url.pathname),file=font?join(PUBLIC,url.pathname):['/studio-core.mjs','/reference-transcript.mjs','/remotion-data.mjs','/editor-session.mjs','/export-view.mjs','/credential-session.mjs','/media-service.mjs','/media-search.mjs'].includes(url.pathname)?join(ROOT,url.pathname.slice(1)):name?join(PUBLIC,name):null;
     if(!file||!existsSync(file))return error(res,404,'Ruta no encontrada');
     const ext=file.slice(file.lastIndexOf('.'));res.writeHead(200,{'content-type':ext==='.ttf'?'font/ttf':types[ext]||'application/octet-stream','content-length':statSync(file).size,...(font?{'access-control-allow-origin':'*'}:{})});createReadStream(file).pipe(res);
   }catch(e){error(res,500,String(e.message||e));}
