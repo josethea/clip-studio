@@ -38,6 +38,7 @@ La interfaz se migrará por módulos. La composición de Remotion ya usa React y
 - Las plantillas de texto y los controles de la toma para capa gráfica y efecto individual también usan React. El efecto individual ahora registra una edición en el historial y activa el guardado automático, igual que los demás ajustes de la toma.
 - Narración y duración, configuración del storyboard en Editor y Medios, y zoom de la línea de tiempo usan controles React conectados a Redux. El controlador conserva las operaciones de recorte de audio, creación del storyboard y asignación para mantener el formato de proyecto actual.
 - El modelo de pistas, marcas, selección y transiciones salió del controlador a `timeline-model.mjs`, con pruebas para cortes y transiciones centradas. Los botones del visor y el mensaje de inspector vacío también son componentes React.
+- El inspector completo se monta ahora en una sola raíz React: título, tiempo y panel seleccionado cambian juntos mediante Redux. Se eliminaron los diez contenedores HTML y las órdenes DOM que los mostraban u ocultaban. Sus controles siguen usando los mismos callbacks de edición.
 - Pendiente: trasladar el resto del estado editable y las acciones de guardado del controlador a módulos de dominio. El modelo de pistas aún se calcula completo antes de filtrar el render de React.
 
 ## Fase 4: exportación y limpieza

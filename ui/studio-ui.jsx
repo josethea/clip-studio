@@ -7,10 +7,10 @@ import {TranscriptApp} from './transcript.jsx';
 import {ProjectApp} from './project.jsx';
 import {AssetLibrary, AssetTarget, ChapterGrouping, AutofillControls, AutofillReviewButton, MissingMediaSummary, MediaBoard, MediaPagination, YoutubeSources} from './media.jsx';
 import {MediaPage} from './media-page.jsx';
-import {SceneInspector, TimelineView, HistoryControls, EffectInspector, TransitionInspector, SfxInspector, AudioInspector} from './editor.jsx';
-import {SceneExtraControls,TemplatePanel,EditorMediaPicker} from './editor-extras.jsx';
-import {NarrationControls,EditorStoryboardControls,MediaStoryboardControls,TimelineToolbar,MonitorActions,EmptyInspector} from './editor-workflow.jsx';
-import {TextInspector,SubtitleInspector,MultiInspector} from './editor-text.jsx';
+import {TimelineView,HistoryControls} from './editor.jsx';
+import {TemplatePanel,EditorMediaPicker} from './editor-extras.jsx';
+import {NarrationControls,EditorStoryboardControls,MediaStoryboardControls,TimelineToolbar,MonitorActions} from './editor-workflow.jsx';
+import {EditorInspectorPanel} from './editor-inspector-panel.jsx';
 import {GlobalControls,FormatControls,PreviewControls} from './editor-controls.jsx';
 import {ExportPage} from './export.jsx';
 import {RenamePanel} from './rename.jsx';
@@ -18,7 +18,7 @@ import {GeminiPanel,KeysPanel,PromptsPanel} from './sidebar-tools.jsx';
 
 const uiSlice=createSlice({
   name:'studioUi',
-  initialState:{globalControls:null,formatControls:null,previewControls:null,editorHistory:{canUndo:false,canRedo:false},exportView:{projectId:null,title:'',problems:['Crea o abre un proyecto'],summary:'',resolutionNote:'',exports:[],ready:null},exportProgress:{mp4:'',running:false,capcut:'',capcutRunning:false,capcutResult:null},renameView:{count:0,duplicates:0,message:''},transcript:null,project:null,projects:[],mediaAssets:null,mediaTarget:{selected:null,scenes:[]},mediaChapters:null,mediaAutofill:{projectId:null,sceneCount:0,entries:[],start:1,running:false,remaining:0,missingOnly:false,requirements:'',canRun:false},autofillProgress:{visible:false,percent:0,status:''},youtubeSources:{projectId:null,json:''},mediaMissing:null,mediaBoard:null,mediaStock:null,mediaPagination:{assets:null,media:null},mediaSession:{activeScene:0,assetTargetScene:null,provider:'storyblocks',type:'videos',query:'',searched:false,missingOnly:false,pexelsPage:0,storyblocksPage:0,googlePage:0},editorScene:null,editorSceneExtras:null,editorTemplates:[],editorMediaPicker:null,editorNarration:null,editorStoryboard:null,editorTimeline:null,editorInspector:null},
+  initialState:{globalControls:null,formatControls:null,previewControls:null,editorHistory:{canUndo:false,canRedo:false},exportView:{projectId:null,title:'',problems:['Crea o abre un proyecto'],summary:'',resolutionNote:'',exports:[],ready:null},exportProgress:{mp4:'',running:false,capcut:'',capcutRunning:false,capcutResult:null},renameView:{count:0,duplicates:0,message:''},transcript:null,project:null,projects:[],mediaAssets:null,mediaTarget:{selected:null,scenes:[]},mediaChapters:null,mediaAutofill:{projectId:null,sceneCount:0,entries:[],start:1,running:false,remaining:0,missingOnly:false,requirements:'',canRun:false},autofillProgress:{visible:false,percent:0,status:''},youtubeSources:{projectId:null,json:''},mediaMissing:null,mediaBoard:null,mediaStock:null,mediaPagination:{assets:null,media:null},mediaSession:{activeScene:0,assetTargetScene:null,provider:'storyblocks',type:'videos',query:'',searched:false,missingOnly:false,pexelsPage:0,storyblocksPage:0,googlePage:0},editorScene:null,editorSceneExtras:null,editorTemplates:[],editorMediaPicker:null,editorNarration:null,editorStoryboard:null,editorTimeline:null,editorInspector:null,editorSelection:null},
   reducers:{
     showGlobalControls(state,action){state.globalControls=action.payload;},
     showFormatControls(state,action){state.formatControls=action.payload;},
@@ -48,7 +48,8 @@ const uiSlice=createSlice({
     showEditorStoryboard(state,action){state.editorStoryboard=action.payload;},
     showEditorTimeline(state,action){state.editorTimeline=action.payload;},
     showEditorHistory(state,action){state.editorHistory=action.payload;},
-    showEditorInspector(state,action){state.editorInspector=action.payload;}
+    showEditorInspector(state,action){state.editorInspector=action.payload;},
+    showEditorSelection(state,action){state.editorSelection=action.payload;}
   }
 });
 const store=configureStore({reducer:{studioUi:uiSlice.reducer}});
@@ -127,8 +128,8 @@ export function renderStockCards(view){store.dispatch(uiSlice.actions.showMediaS
 export function mountMediaPage(){flushSync(()=>root('assets').render(<MediaPage/>));}
 export function getMediaSession(){return store.getState().studioUi.mediaSession;}
 export function patchMediaSession(patch){store.dispatch(uiSlice.actions.patchMediaSession(patch));}
-export function renderSceneInspector(view,actions){renderMediaIsland('scene-list',uiSlice.actions.showEditorScene,view,SceneInspector,actions);}
-export function renderSceneExtras(view,actions){renderMediaIsland('scene-extra-controls',uiSlice.actions.showEditorSceneExtras,view,SceneExtraControls,actions);}
+export function renderSceneInspector(view){store.dispatch(uiSlice.actions.showEditorScene(view));}
+export function renderSceneExtras(view){store.dispatch(uiSlice.actions.showEditorSceneExtras(view));}
 export function renderTemplatePanel(view,actions){renderMediaIsland('template-panel',uiSlice.actions.showEditorTemplates,view,TemplatePanel,actions);}
 export function renderEditorMediaPicker(view,actions){
   store.dispatch(uiSlice.actions.showEditorMediaPicker(view));
@@ -136,8 +137,9 @@ export function renderEditorMediaPicker(view,actions){
 }
 export function mountEditorButtons(actions){
   root('monitor-actions').render(<MonitorActions actions={actions}/>);
-  root('inspector-empty').render(<EmptyInspector actions={actions}/>);
 }
+export function mountEditorInspector(actions){root('inspector-app').render(<Provider store={store}><EditorInspectorPanel actions={actions}/></Provider>);}
+export function renderInspectorSelection(view){store.dispatch(uiSlice.actions.showEditorSelection(view));}
 export function renderNarrationPanel(view,actions){renderMediaIsland('narration-controls',uiSlice.actions.showEditorNarration,view,NarrationControls,actions);}
 export function renderStoryboardSettings(view,actions){
   store.dispatch(uiSlice.actions.showEditorStoryboard(view));
@@ -153,9 +155,6 @@ export function renderEditorHistory(view,actions){
   store.dispatch(uiSlice.actions.showEditorHistory(view));
   if(!roots.has('editor-actions'))root('editor-actions').render(<Provider store={store}><HistoryControls actions={actions}/></Provider>);
 }
-export function renderEditorInspector(view,actions){
+export function renderEditorInspector(view){
   store.dispatch(uiSlice.actions.showEditorInspector(view));
-  for(const [id,Component] of [['inspector-effect',EffectInspector],['inspector-transition',TransitionInspector],['inspector-sfx',SfxInspector]])if(!roots.has(id))root(id).render(<Provider store={store}><Component actions={actions}/></Provider>);
-  for(const kind of ['voice','music'])if(!roots.has(`inspector-${kind}`))root(`inspector-${kind}`).render(<Provider store={store}><AudioInspector kind={kind} actions={actions}/></Provider>);
-  for(const [id,Component] of [['inspector-text',TextInspector],['inspector-subtitle',SubtitleInspector],['inspector-multi',MultiInspector]])if(!roots.has(id))root(id).render(<Provider store={store}><Component actions={actions}/></Provider>);
 }
