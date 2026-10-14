@@ -22,6 +22,7 @@ La interfaz se migrará por módulos. La composición de Remotion ya usa React y
 - El formulario de fuentes de YouTube y su progreso son componentes React. Su borrador se conserva mientras se edita el mismo proyecto y se reinicia al abrir otro; el controlador mantiene la descarga y la espera de la tarea del servidor.
 - La secuencia automática, sus requisitos de claves, el progreso y el acceso a bloques sin medio ya se muestran y editan con React. El controlador conserva la ejecución de la tarea y sincroniza la escena activa conforme se completa.
 - El selector de material del editor usa ahora React: pestañas, paginación de 12 medios, selección y confirmación. Solo monta las tarjetas de la página visible. Las operaciones restantes de Medios siguen coordinadas por el controlador.
+- La validación de capítulos y search terms, la agrupación de bloques en escenas y la asignación inicial por nombre o capítulo están en `storyboard-model.mjs`. `project-model.mjs` inicializa los ajustes editoriales y recupera search terms guardados en el campo antiguo. El controlador conserva las llamadas de guardado y la navegación de pestañas.
 
 ## Fase 3: editor
 
