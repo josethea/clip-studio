@@ -1,5 +1,6 @@
 import React, {useState} from 'react';
 import {useSelector} from 'react-redux';
+import {transitions,transitionLabels} from '../studio-core.mjs';
 
 const fitOptions=[['','Usar encuadre global'],['fill','Llenar pantalla · recortar'],['contain','Foto completa · fondo negro'],['blur','Foto completa · fondo desenfocado'],['frame','Foto enmarcada']];
 const motionOptions=[['','Usar ajuste global'],['static','Sin movimiento'],['zoom-in','Acercar'],['zoom-out','Alejar'],['pan-left','Recorrer a izquierda'],['pan-right','Recorrer a derecha'],['pan-up','Recorrer arriba'],['pan-down','Recorrer abajo'],['pulse','Pulso']];
@@ -47,4 +48,50 @@ export function TimelineLane({lane}){
   const view=useSelector(state=>state.studioUi.editorTimeline);
   if(!view)return null;
   return <>{(view.lanes[lane]||[]).map(item=><TimelineItem key={item.key} item={item} scale={view.scale}/>)}</>;
+}
+
+const effects=[['global','Usar secuencia global'],['none','Sin efecto'],['warm','Cálido'],['cool','Frío'],['mono','Monocromo'],['vivid','Vibrante'],['vintage','Vintage'],['contrast','Alto contraste'],['soft','Suave'],['fade','Deslavado'],['green','Verde cine'],['purple','Violeta']];
+
+export function EffectInspector({actions}){
+  const view=useSelector(state=>state.studioUi.editorInspector);
+  if(view?.type!=='effect')return null;
+  return <><p className="studio-help">Toma {view.index+1} · {time(view.start)}–{time(view.end)} · {view.override?'Ajuste individual':'Secuencia global'}</p>
+    <label>Efecto visual de esta toma<select value={view.override||'global'} onChange={event=>actions.effect(view.index,event.target.value)}>{effects.map(([value,label])=><option key={value} value={value}>{label}</option>)}</select></label>
+    <p className="studio-help">La pista muestra el efecto aplicado a cada toma. Puedes reemplazarlo aquí sin cambiar la secuencia global.</p>
+    <button className="secondary" onClick={()=>actions.effect(view.index,'global')}>Restaurar efecto global</button>
+  </>;
+}
+
+export function TransitionInspector({actions}){
+  const view=useSelector(state=>state.studioUi.editorInspector);
+  if(view?.type!=='transition')return null;
+  return <><p className="studio-help">Tomas {view.index+1} → {view.index+2} · {time(view.cut)}</p>
+    <label>Tipo de transición<select value={view.transition} onChange={event=>actions.transition(view.index,event.target.value)}>{transitions.map(value=><option key={value} value={value}>{transitionLabels[value]||value}</option>)}</select></label>
+    <label>Duración de esta transición (s)<input key={`${view.index}:${view.duration}`} type="number" min="0" max="2" step="0.05" defaultValue={view.duration} onBlur={event=>{if(Number(event.target.value)!==Number(view.duration))actions.transitionDuration(view.index,Number(event.target.value));}}/></label>
+    <p className="studio-help">Se omite si cualquiera de las tomas dura menos. Esta elección reemplaza la secuencia global solo en este corte.</p>
+    <button className="secondary" onClick={()=>actions.transitionInherit(view.index)}>Usar secuencia global</button><button className="secondary" onClick={()=>actions.transitionPreview(view.index)}>▶ Ver transición</button>
+  </>;
+}
+
+export function SfxInspector({actions}){
+  const view=useSelector(state=>state.studioUi.editorInspector);
+  if(view?.type!=='sfx')return null;
+  const change=(key,event)=>actions.sfx(view.index,key,event.target.type==='number'?Number(event.target.value):event.target.value||null);
+  return <><p className="studio-help">Corte después de la toma {view.index+1}</p>
+    <label>Sonido<select value={view.sfxId||''} onChange={event=>change('sfxId',event)}><option value="">Ninguno</option>{view.assets.map(asset=><option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></label>
+    <label>Volumen (%)<input key={`${view.index}:volume:${view.volume}`} type="number" min="0" max="100" defaultValue={view.volume} onBlur={event=>{if(Number(event.target.value)!==Number(view.volume))change('sfxVolume',event);}}/></label>
+    <label>Alineación<select value={view.align} onChange={event=>change('sfxAlign',event)}><option value="start">Inicio</option><option value="center">Centro</option><option value="end">Final</option></select></label>
+    <label>Desfase (s)<input key={`${view.index}:offset:${view.offset}`} type="number" step=".05" defaultValue={view.offset} onBlur={event=>{if(Number(event.target.value)!==Number(view.offset))change('sfxOffset',event);}}/></label>
+  </>;
+}
+
+export function AudioInspector({kind,actions}){
+  const view=useSelector(state=>state.studioUi.editorInspector);
+  const [dragging,setDragging]=useState(false);
+  if(view?.type!==kind)return null;
+  const voice=kind==='voice',inputId=voice?'inspector-voice-upload':'inspector-music-upload';
+  return <><label>{voice?'Narración':'Música'}<select value={voice?view.narrationId||'':view.musicId||''} onChange={event=>actions.audioSelect(voice?'narrationId':'musicId',event.target.value)}><option value="">Ninguno</option>{view.assets.map(asset=><option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></label>
+    <label className={`inspector-upload drop-zone ${dragging?'dragging':''}`} onDragOver={event=>{event.preventDefault();setDragging(true);}} onDragLeave={()=>setDragging(false)} onDrop={event=>{event.preventDefault();setDragging(false);actions.audioDrop(inputId,event.dataTransfer);}}>↥ Arrastra o sube {voice?'narración':'música'}<input id={inputId} type="file" accept="audio/*" onChange={event=>{const files=[...event.target.files];event.target.value='';actions.audioUpload(inputId,files);}}/></label>
+    {voice?<p className="studio-help">La duración de la voz guía el montaje. Ajusta las pausas de todos los bloques en el panel izquierdo.</p>:<><label>Volumen de música (%)<input key={view.musicVolume} type="number" min="0" max="100" defaultValue={view.musicVolume} onBlur={event=>{if(Number(event.target.value)!==Number(view.musicVolume))actions.musicVolume(Number(event.target.value));}}/></label><p className="studio-help">La música se repite durante el montaje.</p></>}
+  </>;
 }

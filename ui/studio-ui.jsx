@@ -8,11 +8,11 @@ import {TranscriptApp} from './transcript.jsx';
 import {ProjectApp} from './project.jsx';
 import {AssetLibrary, ChapterGrouping, AutofillEntries, MissingMediaSummary, MediaBoard, MediaPagination} from './media.jsx';
 import {MediaPage} from './media-page.jsx';
-import {SceneInspector, TimelineRuler, TimelineLane} from './editor.jsx';
+import {SceneInspector, TimelineRuler, TimelineLane, EffectInspector, TransitionInspector, SfxInspector, AudioInspector} from './editor.jsx';
 
 const uiSlice=createSlice({
   name:'studioUi',
-  initialState:{transitionSequence:['remotion:none'],projectId:null,projectTitle:'',exports:[],transcript:null,project:null,projects:[],mediaAssets:null,mediaChapters:null,autofillEntries:[],mediaMissing:null,mediaBoard:null,mediaStock:null,mediaPagination:{assets:null,media:null},mediaSession:{activeScene:0,provider:'storyblocks',type:'videos',query:'',searched:false,missingOnly:false,pexelsPage:0,storyblocksPage:0,googlePage:0},editorScene:null,editorTimeline:null},
+  initialState:{transitionSequence:['remotion:none'],projectId:null,projectTitle:'',exports:[],transcript:null,project:null,projects:[],mediaAssets:null,mediaChapters:null,autofillEntries:[],mediaMissing:null,mediaBoard:null,mediaStock:null,mediaPagination:{assets:null,media:null},mediaSession:{activeScene:0,provider:'storyblocks',type:'videos',query:'',searched:false,missingOnly:false,pexelsPage:0,storyblocksPage:0,googlePage:0},editorScene:null,editorTimeline:null,editorInspector:null},
   reducers:{
     showTransitions(state,action){state.transitionSequence=action.payload;},
     showExports(state,action){Object.assign(state,action.payload);},
@@ -28,7 +28,8 @@ const uiSlice=createSlice({
     showMediaPagination(state,action){state.mediaPagination[action.payload.kind]=action.payload.view;},
     patchMediaSession(state,action){Object.assign(state.mediaSession,action.payload);},
     showEditorScene(state,action){state.editorScene=action.payload;},
-    showEditorTimeline(state,action){state.editorTimeline=action.payload;}
+    showEditorTimeline(state,action){state.editorTimeline=action.payload;},
+    showEditorInspector(state,action){state.editorInspector=action.payload;}
   }
 });
 const store=configureStore({reducer:{studioUi:uiSlice.reducer}});
@@ -102,6 +103,11 @@ export function patchMediaSession(patch){store.dispatch(uiSlice.actions.patchMed
 export function renderSceneInspector(view,actions){renderMediaIsland('scene-list',uiSlice.actions.showEditorScene,view,SceneInspector,actions);}
 export function renderEditorTimeline(view){
   store.dispatch(uiSlice.actions.showEditorTimeline(view));
-  root('timeline-ruler').render(<Provider store={store}><TimelineRuler/></Provider>);
-  for(const lane of ['text-timeline','timeline','effect-timeline','transition-timeline','audio-timeline','music-timeline','sfx-timeline','subtitle-timeline'])root(lane).render(<Provider store={store}><TimelineLane lane={lane}/></Provider>);
+  if(!roots.has('timeline-ruler'))root('timeline-ruler').render(<Provider store={store}><TimelineRuler/></Provider>);
+  for(const lane of ['text-timeline','timeline','effect-timeline','transition-timeline','audio-timeline','music-timeline','sfx-timeline','subtitle-timeline'])if(!roots.has(lane))root(lane).render(<Provider store={store}><TimelineLane lane={lane}/></Provider>);
+}
+export function renderEditorInspector(view,actions){
+  store.dispatch(uiSlice.actions.showEditorInspector(view));
+  for(const [id,Component] of [['inspector-effect',EffectInspector],['inspector-transition',TransitionInspector],['inspector-sfx',SfxInspector]])if(!roots.has(id))root(id).render(<Provider store={store}><Component actions={actions}/></Provider>);
+  for(const kind of ['voice','music'])if(!roots.has(`inspector-${kind}`))root(`inspector-${kind}`).render(<Provider store={store}><AudioInspector kind={kind} actions={actions}/></Provider>);
 }

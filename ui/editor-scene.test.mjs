@@ -9,11 +9,11 @@ import {renderToStaticMarkup} from 'react-dom/server';
 import {Provider} from 'react-redux';
 import {configureStore} from '@reduxjs/toolkit';
 
-test('scene inspector renders the selected scene and its saved adjustments',async()=>{
+test('editor inspectors and timeline render saved selections and controls',async()=>{
   const root=resolve(import.meta.dirname,'..'),temp=await mkdtemp(join(root,'node_modules','.editor-test-'));
   try{
     await build({entryPoints:[join(root,'ui','editor.jsx')],bundle:true,packages:'external',platform:'node',format:'esm',jsx:'automatic',outfile:join(temp,'editor.mjs')});
-    const {SceneInspector,TimelineLane,TimelineRuler}=await import(pathToFileURL(join(temp,'editor.mjs')).href);
+    const {SceneInspector,TimelineLane,TimelineRuler,EffectInspector,TransitionInspector,SfxInspector,AudioInspector}=await import(pathToFileURL(join(temp,'editor.mjs')).href);
     const view={projectId:'project',index:5,scene:{start:12,end:15,text:'Una toma',assetId:'asset-2',fitOverride:'frame',motionOverride:'pan-left',sourceStart:1.5,zoomPercentOverride:14},asset:{id:'asset-2',name:'Foto',type:'image'},assets:[{id:'asset-2',name:'Foto'}],zoomPercent:10};
     const store=configureStore({reducer:()=>({studioUi:{editorScene:view}})});
     const html=renderToStaticMarkup(React.createElement(Provider,{store},React.createElement(SceneInspector,{actions:{}})));
@@ -30,5 +30,18 @@ test('scene inspector renders the selected scene and its saved adjustments',asyn
     assert.match(track,/data-boundary="0"/);
     assert.match(track,/left:100px/);
     assert.match(ruler,/left:164px/);
+    const inspector=(view,Component)=>renderToStaticMarkup(React.createElement(Provider,{store:configureStore({reducer:()=>({studioUi:{editorInspector:view}})})},React.createElement(Component,{actions:{}})));
+    const effect=inspector({type:'effect',index:1,start:5,end:10,override:'warm'},EffectInspector);
+    const transition=inspector({type:'transition',index:1,cut:10,transition:'remotion:slide:bottom',duration:0.5},TransitionInspector);
+    const sfx=inspector({type:'sfx',index:1,sfxId:'audio-1',volume:70,align:'end',offset:0.2,assets:[{id:'audio-1',name:'Golpe'}]},SfxInspector);
+    assert.match(effect,/value="warm" selected=""/);
+    assert.match(transition,/value="remotion:slide:bottom" selected=""/);
+    assert.match(transition,/value="0.5"/);
+    assert.match(sfx,/value="audio-1" selected=""/);
+    assert.match(sfx,/value="end" selected=""/);
+    const audioView={type:'music',narrationId:'audio-1',musicId:'audio-2',musicVolume:35,assets:[{id:'audio-1',name:'Voz'},{id:'audio-2',name:'Música'}]};
+    const audio=inspector(audioView,props=>React.createElement(AudioInspector,{...props,kind:'music'}));
+    assert.match(audio,/value="audio-2" selected=""/);
+    assert.match(audio,/value="35"/);
   }finally{await rm(temp,{recursive:true,force:true});}
 });
