@@ -1,20 +1,29 @@
 import React, {memo} from 'react';
 import {createRoot} from 'react-dom/client';
+import {flushSync} from 'react-dom';
 import {Provider, useSelector} from 'react-redux';
 import {configureStore, createSlice} from '@reduxjs/toolkit';
 import {transitions, transitionLabels} from '../studio-core.mjs';
 import {TranscriptApp} from './transcript.jsx';
 import {ProjectApp} from './project.jsx';
+import {AssetLibrary, ChapterGrouping, AutofillEntries, MissingMediaSummary, MediaBoard} from './media.jsx';
+import {MediaPage} from './media-page.jsx';
 
 const uiSlice=createSlice({
   name:'studioUi',
-  initialState:{transitionSequence:['remotion:none'],projectId:null,projectTitle:'',exports:[],transcript:null,project:null,projects:[]},
+  initialState:{transitionSequence:['remotion:none'],projectId:null,projectTitle:'',exports:[],transcript:null,project:null,projects:[],mediaAssets:null,mediaChapters:null,autofillEntries:[],mediaMissing:null,mediaBoard:null,mediaStock:null},
   reducers:{
     showTransitions(state,action){state.transitionSequence=action.payload;},
     showExports(state,action){Object.assign(state,action.payload);},
     showTranscript(state,action){state.transcript=action.payload;},
     showProject(state,action){state.project=action.payload;},
-    showProjects(state,action){state.projects=action.payload;}
+    showProjects(state,action){state.projects=action.payload;},
+    showMediaAssets(state,action){state.mediaAssets=action.payload;},
+    showMediaChapters(state,action){state.mediaChapters=action.payload;},
+    showAutofillEntries(state,action){state.autofillEntries=action.payload;},
+    showMediaMissing(state,action){state.mediaMissing=action.payload;},
+    showMediaBoard(state,action){state.mediaBoard=action.payload;},
+    showMediaStock(state,action){state.mediaStock=action.payload;}
   }
 });
 const store=configureStore({reducer:{studioUi:uiSlice.reducer}});
@@ -67,3 +76,15 @@ export function renderProjectPanel(info,actions){
 export function renderProjectOptions(projects){
   store.dispatch(uiSlice.actions.showProjects(projects.slice().sort((a,b)=>b.updatedAt.localeCompare(a.updatedAt))));
 }
+
+function renderMediaIsland(id,action,payload,Component){
+  store.dispatch(action(payload));
+  root(id).render(<Provider store={store}><Component/></Provider>);
+}
+export const renderAssetLibrary=view=>renderMediaIsland('asset-list',uiSlice.actions.showMediaAssets,view,AssetLibrary);
+export const renderChapterGroups=view=>renderMediaIsland('chapter-grouping',uiSlice.actions.showMediaChapters,view,ChapterGrouping);
+export const renderAutofillSequence=entries=>renderMediaIsland('autofill-sequence',uiSlice.actions.showAutofillEntries,entries,AutofillEntries);
+export const renderMissingSummary=view=>renderMediaIsland('media-missing-summary',uiSlice.actions.showMediaMissing,view,MissingMediaSummary);
+export const renderStoryboard=view=>renderMediaIsland('media-board',uiSlice.actions.showMediaBoard,view,MediaBoard);
+export function renderStockCards(view){store.dispatch(uiSlice.actions.showMediaStock(view));}
+export function mountMediaPage(){flushSync(()=>root('assets').render(<MediaPage/>));}

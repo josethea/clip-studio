@@ -13,10 +13,9 @@ La interfaz se migrará por módulos. La composición de Remotion ya usa React y
 ## Fase 2: proyecto, transcript y medios
 
 - Proyecto y Transcript migrados a componentes React. Los formularios y resultados temporales viven en React; listas y resúmenes se sincronizan con Redux Toolkit. La conversión SRT y el guardado siguen usando las funciones existentes para conservar el formato de los proyectos.
-- Pendiente en esta fase: Medios y consolidar la edición del proyecto en un único estado compartido.
-- Componentes por pestaña y subcomponentes para carga, validación, storyboard y buscadores.
-- Una sola fuente de verdad para proyecto, selección, búsqueda y progreso; separar estado persistido del proyecto de estado temporal de la interfaz.
-- Cargar medios y páginas a demanda para evitar insertar cientos de tarjetas y miniaturas a la vez.
+- La estructura de Medios se monta desde componentes React para Biblioteca, Storyboard, búsqueda automática y fuentes de YouTube. Biblioteca, tarjetas, resultados, capítulos, secuencia automática y bloques sin medio se dibujan en React. El selector de assets se monta solo en la tarjeta activa para evitar miles de opciones DOM en proyectos grandes.
+- Las tarjetas de Biblioteca y Storyboard conservan la paginación de 15 elementos; los resultados de búsqueda muestran hasta cinco por página.
+- Pendiente: trasladar las acciones de Medios al estado compartido y separar por completo el estado persistido del proyecto del estado temporal de la interfaz.
 
 ## Fase 3: editor
 
@@ -33,4 +32,4 @@ La interfaz se migrará por módulos. La composición de Remotion ya usa React y
 
 El render usa dos procesos en paralelo por defecto. `CLIP_STUDIO_RENDER_CONCURRENCY=3` permite probar tres en el VPS; conviene comparar tiempo y memoria con el mismo proyecto antes de fijarlo. Este ajuste acelera el render cuando hay CPU disponible, pero no cambia la fluidez de la interfaz.
 
-Cada fase debe conservar la apertura de proyectos antiguos, la edición y la exportación antes de reemplazar el módulo siguiente.
+La prueba de aceptación se hará con un proyecto nuevo, tanto localmente como en producción. La edición y exportación deben seguir funcionando antes de reemplazar el módulo siguiente.
