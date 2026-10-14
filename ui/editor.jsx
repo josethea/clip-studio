@@ -1,7 +1,8 @@
-import React, {useRef,useState} from 'react';
+import React, {useEffect,useRef,useState} from 'react';
 import {useSelector} from 'react-redux';
 import {transitions,transitionLabels} from '../studio-core.mjs';
 import {pointerTime,shiftTextRange,boundaryTime} from './timeline-geometry.mjs';
+import {visibleTimelineItems,visibleTimelineTicks} from './timeline-window.mjs';
 
 const fitOptions=[['','Usar encuadre global'],['fill','Llenar pantalla · recortar'],['contain','Foto completa · fondo negro'],['blur','Foto completa · fondo desenfocado'],['frame','Foto enmarcada']];
 const motionOptions=[['','Usar ajuste global'],['static','Sin movimiento'],['zoom-in','Acercar'],['zoom-out','Alejar'],['pan-left','Recorrer a izquierda'],['pan-right','Recorrer a derecha'],['pan-up','Recorrer arriba'],['pan-down','Recorrer abajo'],['pulse','Pulso']];
@@ -30,7 +31,7 @@ export function SceneInspector({actions}){
   return view?<SceneDetails key={view.index} view={view} actions={actions}/>:null;
 }
 
-function RulerContent({view}){return <>{view.ticks.map(tick=><span key={tick.time} className="timeline-tick" style={{left:tick.left}}>{time(tick.time)}</span>)}</>;}
+function RulerContent({view,viewport}){const ticks=viewport?visibleTimelineTicks(view.ticks,viewport.left,viewport.width):view.ticks;return <>{ticks.map(tick=><span key={tick.time} className="timeline-tick" style={{left:tick.left}}>{time(tick.time)}</span>)}</>;}
 export function TimelineRuler(){const view=useSelector(state=>state.studioUi.editorTimeline);return view?<RulerContent view={view}/>:null;}
 
 function TimelineItem({item,scale}){
@@ -42,7 +43,7 @@ function TimelineItem({item,scale}){
   </div>;
 }
 
-function LaneContent({view,lane}){return <>{(view.lanes[lane]||[]).map(item=><TimelineItem key={item.key} item={item} scale={view.scale}/>)}</>;}
+function LaneContent({view,lane,viewport}){const items=view.lanes[lane]||[],visible=viewport?visibleTimelineItems(items,view.scale,viewport.left,viewport.width):items;return <>{visible.map(item=><TimelineItem key={item.key} item={item} scale={view.scale}/>)}</>;}
 export function TimelineLane({lane}){const view=useSelector(state=>state.studioUi.editorTimeline);return view?<LaneContent view={view} lane={lane}/>:null;}
 
 const laneRows=[['text-timeline','TEXTOS'],['timeline','VIDEO'],['effect-timeline','EFECTOS'],['transition-timeline','TRANS.'],['subtitle-timeline','SUBS'],['music-timeline','MÚSICA'],['sfx-timeline','SFX'],['audio-timeline','VOZ']];
@@ -55,6 +56,18 @@ function TimelinePlayhead(){
 export function TimelineView({actions}){
   const view=useSelector(state=>state.studioUi.editorTimeline);
   const drag=useRef(null);
+  const contentRef=useRef(null);
+  const [viewport,setViewport]=useState({left:0,width:1200});
+  useEffect(()=>{
+    const scroll=contentRef.current?.closest('.timeline-scroll');if(!scroll)return;
+    let frame=0;
+    const measure=()=>{frame=0;const left=scroll.scrollLeft,width=scroll.clientWidth;setViewport(previous=>previous.left===left&&previous.width===width?previous:{left,width});};
+    const schedule=()=>{if(!frame)frame=requestAnimationFrame(measure);};
+    scroll.addEventListener('scroll',schedule,{passive:true});
+    const observer=typeof ResizeObserver==='undefined'?null:new ResizeObserver(schedule);observer?.observe(scroll);
+    measure();
+    return ()=>{scroll.removeEventListener('scroll',schedule);observer?.disconnect();if(frame)cancelAnimationFrame(frame);};
+  },[!!view]);
   if(!view)return null;
   const atTime=event=>pointerTime(event.clientX,event.currentTarget.getBoundingClientRect().left,view.scale);
   const finish=event=>{
@@ -103,9 +116,9 @@ export function TimelineView({actions}){
     }else if(current.kind==='boundary')actions.trimBoundary(current.index,boundaryTime(atTime(event),current.min,current.max));
     else actions.trimCue(current.type,current.index,current.edge,atTime(event));
   };
-  return <div className="timeline-content" style={{width:view.width}} onPointerDown={down} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish}>
-    <div className="timeline-ruler"><RulerContent view={view}/></div>
-    {laneRows.map(([id,label])=><div className="timeline-track" key={id}><b>{label}</b><div className="timeline-lane" style={{width:view.laneWidth}}><LaneContent view={view} lane={id}/></div></div>)}
+  return <div ref={contentRef} className="timeline-content" style={{width:view.width}} onPointerDown={down} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish}>
+    <div className="timeline-ruler"><RulerContent view={view} viewport={viewport}/></div>
+    {laneRows.map(([id,label])=><div className="timeline-track" key={id}><b>{label}</b><div className="timeline-lane" style={{width:view.laneWidth}}><LaneContent view={view} lane={id} viewport={viewport}/></div></div>)}
     <TimelinePlayhead/>
   </div>;
 }

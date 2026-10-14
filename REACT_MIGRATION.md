@@ -27,7 +27,9 @@ La interfaz se migrará por módulos. La composición de Remotion ya usa React y
 - El montaje global, los efectos, el encuadre, el formato de salida y la barra de reproducción del visor son componentes React conectados a Redux. El montaje de Remotion permanece fuera de la raíz de los controles para que una actualización de React no reinicie el video.
 - La línea de tiempo completa usa una raíz React. El componente gestiona selección simple y múltiple, arrastre del cabezal, movimiento de textos y ajuste de los bordes de tomas, textos y subtítulos. El cabezal conserva prioridad sobre los clips y seleccionar un elemento no cambia el tiempo de reproducción.
 - Deshacer, rehacer y guardar edición son controles React; la historia se sigue limitando a 80 estados y cada arrastre registra un solo estado al comenzar a moverse.
-- Pendiente: medir latencia con cientos de escenas y renderizar solo el rango visible de la línea de tiempo. Después, extraer el estado editable y las llamadas de guardado del controlador restante.
+- La línea de tiempo conserva el ancho y la posición de todos los elementos, pero React monta solo los bloques y marcas cercanos al área visible. El rango se actualiza al desplazar o redimensionar el panel; el margen adicional mantiene accesibles los bordes próximos para arrastrar y ajustar.
+- `node benchmark-timeline.mjs` compara el costo de generar el marcado completo con el de la ventana visible para 666 escenas y siete pistas. Es una medición sintética local de React, no una medida de fluidez del navegador ni del tiempo de exportación.
+- Pendiente: extraer el estado editable y las llamadas de guardado del controlador restante. El modelo de pistas aún se calcula completo antes de filtrar el render de React.
 
 ## Fase 4: exportación y limpieza
 
