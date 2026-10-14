@@ -6,7 +6,7 @@
 <section class="page" id="assets"></section>
 <section class="page editor-page" id="editor">
   <div class="section-heading"><span class="eyebrow">04 · EDITOR</span><h1>Mesa de montaje</h1><p>Revisa el vídeo en vivo, ajusta la línea de tiempo y edita cada elemento desde su panel de propiedades.</p></div>
-  <div class="editor-topline"><strong id="editor-project-name">Proyecto</strong><span id="editor-dirty">Todos los cambios guardados</span><div class="studio-actions"><button class="secondary" id="editor-undo" title="Deshacer · ⌘Z">↶</button><button class="secondary" id="editor-redo" title="Rehacer · ⌘⇧Z">↷</button><button class="primary" id="save-editor">Guardar edición</button></div></div>
+  <div class="editor-topline"><strong id="editor-project-name">Proyecto</strong><span id="editor-dirty">Todos los cambios guardados</span><div id="editor-actions" class="studio-actions"></div></div>
   <div class="editor-workspace" id="editor-workspace">
     <aside class="editor-global" aria-label="Ajustes globales">
       <div class="editor-pane-title"><span>AJUSTES GLOBALES</span><small>Todo el vídeo</small></div>
@@ -35,7 +35,7 @@
     </aside>
       </div>
       <div class="editor-resize-handle editor-resize-timeline" data-editor-resize="timeline" title="Arrastra para cambiar la altura del timeline" role="separator" aria-label="Ajustar altura del timeline" aria-orientation="horizontal" tabindex="0"></div>
-    <article class="editor-timeline"><div class="timeline-toolbar"><strong>LÍNEA DE TIEMPO</strong><label>Zoom <input id="timeline-zoom" type="range" min="2" max="120" value="8"></label><span id="timeline-zoom-label">8 px/s</span><span>Arrastra el cabezal para buscar. Mueve los textos o arrastra sus bordes para ajustar la duración.</span></div><div class="timeline-scroll" id="timeline-scroll"><div class="timeline-content" id="timeline-content"><div class="timeline-ruler" id="timeline-ruler"></div><div class="timeline-track"><b>TEXTOS</b><div id="text-timeline" class="timeline-lane"></div></div><div class="timeline-track"><b>VIDEO</b><div id="timeline" class="timeline-lane"></div></div><div class="timeline-track"><b>EFECTOS</b><div id="effect-timeline" class="timeline-lane"></div></div><div class="timeline-track"><b>TRANS.</b><div id="transition-timeline" class="timeline-lane"></div></div><div class="timeline-track"><b>SUBS</b><div id="subtitle-timeline" class="timeline-lane"></div></div><div class="timeline-track"><b>MÚSICA</b><div id="music-timeline" class="timeline-lane"></div></div><div class="timeline-track"><b>SFX</b><div id="sfx-timeline" class="timeline-lane"></div></div><div class="timeline-track"><b>VOZ</b><div id="audio-timeline" class="timeline-lane"></div></div><div id="timeline-playhead" class="timeline-playhead"></div></div></div></article>
+    <article class="editor-timeline"><div class="timeline-toolbar"><strong>LÍNEA DE TIEMPO</strong><label>Zoom <input id="timeline-zoom" type="range" min="2" max="120" value="8"></label><span id="timeline-zoom-label">8 px/s</span><span>Arrastra el cabezal para buscar. Mueve los textos o arrastra sus bordes para ajustar la duración.</span></div><div class="timeline-scroll" id="timeline-scroll"><div id="timeline-root"></div></div></article>
     </div>
   </div>
 </section>

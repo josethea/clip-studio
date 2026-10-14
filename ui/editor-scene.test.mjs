@@ -13,7 +13,7 @@ test('editor inspectors and timeline render saved selections and controls',async
   const root=resolve(import.meta.dirname,'..'),temp=await mkdtemp(join(root,'node_modules','.editor-test-'));
   try{
     await build({entryPoints:[join(root,'ui','editor.jsx')],bundle:true,packages:'external',platform:'node',format:'esm',jsx:'automatic',outfile:join(temp,'editor.mjs')});
-    const {SceneInspector,TimelineLane,TimelineRuler,EffectInspector,TransitionInspector,SfxInspector,AudioInspector}=await import(pathToFileURL(join(temp,'editor.mjs')).href);
+    const {SceneInspector,TimelineLane,TimelineRuler,TimelineView,HistoryControls,EffectInspector,TransitionInspector,SfxInspector,AudioInspector}=await import(pathToFileURL(join(temp,'editor.mjs')).href);
     const view={projectId:'project',index:5,scene:{start:12,end:15,text:'Una toma',assetId:'asset-2',fitOverride:'frame',motionOverride:'pan-left',sourceStart:1.5,zoomPercentOverride:14},asset:{id:'asset-2',name:'Foto',type:'image'},assets:[{id:'asset-2',name:'Foto'}],zoomPercent:10};
     const store=configureStore({reducer:()=>({studioUi:{editorScene:view}})});
     const html=renderToStaticMarkup(React.createElement(Provider,{store},React.createElement(SceneInspector,{actions:{}})));
@@ -30,6 +30,14 @@ test('editor inspectors and timeline render saved selections and controls',async
     assert.match(track,/data-boundary="0"/);
     assert.match(track,/left:100px/);
     assert.match(ruler,/left:164px/);
+    const fullTimeline=renderToStaticMarkup(React.createElement(Provider,{store:timelineStore},React.createElement(TimelineView,{actions:{}})));
+    assert.match(fullTimeline,/class="timeline-content"/);
+    assert.match(fullTimeline,/data-boundary="0"/);
+    assert.match(fullTimeline,/id="timeline-playhead"/);
+    const historyStore=configureStore({reducer:()=>({studioUi:{editorHistory:{canUndo:true,canRedo:false}}})});
+    const history=renderToStaticMarkup(React.createElement(Provider,{store:historyStore},React.createElement(HistoryControls,{actions:{}})));
+    assert.match(history,/Deshacer · ⌘Z/);
+    assert.match(history,/Rehacer · ⌘⇧Z" disabled=""/);
     const inspector=(view,Component)=>renderToStaticMarkup(React.createElement(Provider,{store:configureStore({reducer:()=>({studioUi:{editorInspector:view}})})},React.createElement(Component,{actions:{}})));
     const effect=inspector({type:'effect',index:1,start:5,end:10,override:'warm'},EffectInspector);
     const transition=inspector({type:'transition',index:1,cut:10,transition:'remotion:slide:bottom',duration:0.5},TransitionInspector);

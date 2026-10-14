@@ -25,7 +25,9 @@ La interfaz se migrará por módulos. La composición de Remotion ya usa React y
 - Los paneles de efecto visual, transición, sonido, narración y música ya se dibujan en React y envían sus cambios mediante callbacks. Sus raíces se montan una vez y reciben las actualizaciones posteriores desde Redux.
 - Los paneles de texto, subtítulos y selección múltiple también usan React. Los campos de escritura mantienen un borrador local; las plantillas aplican únicamente sus propiedades de estilo y los colores tienen selectores y presets propios de los componentes.
 - El montaje global, los efectos, el encuadre, el formato de salida y la barra de reproducción del visor son componentes React conectados a Redux. El montaje de Remotion permanece fuera de la raíz de los controles para que una actualización de React no reinicie el video.
-- Pendiente: migrar los gestos de selección, undo/redo y drag/resize. Medir latencia con cientos de escenas y después renderizar solo el rango visible de la timeline.
+- La línea de tiempo completa usa una raíz React. El componente gestiona selección simple y múltiple, arrastre del cabezal, movimiento de textos y ajuste de los bordes de tomas, textos y subtítulos. El cabezal conserva prioridad sobre los clips y seleccionar un elemento no cambia el tiempo de reproducción.
+- Deshacer, rehacer y guardar edición son controles React; la historia se sigue limitando a 80 estados y cada arrastre registra un solo estado al comenzar a moverse.
+- Pendiente: medir latencia con cientos de escenas y renderizar solo el rango visible de la línea de tiempo. Después, extraer el estado editable y las llamadas de guardado del controlador restante.
 
 ## Fase 4: exportación y limpieza
 

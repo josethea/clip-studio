@@ -1,6 +1,7 @@
-import React, {useState} from 'react';
+import React, {useRef,useState} from 'react';
 import {useSelector} from 'react-redux';
 import {transitions,transitionLabels} from '../studio-core.mjs';
+import {pointerTime,shiftTextRange,boundaryTime} from './timeline-geometry.mjs';
 
 const fitOptions=[['','Usar encuadre global'],['fill','Llenar pantalla · recortar'],['contain','Foto completa · fondo negro'],['blur','Foto completa · fondo desenfocado'],['frame','Foto enmarcada']];
 const motionOptions=[['','Usar ajuste global'],['static','Sin movimiento'],['zoom-in','Acercar'],['zoom-out','Alejar'],['pan-left','Recorrer a izquierda'],['pan-right','Recorrer a derecha'],['pan-up','Recorrer arriba'],['pan-down','Recorrer abajo'],['pulse','Pulso']];
@@ -29,11 +30,8 @@ export function SceneInspector({actions}){
   return view?<SceneDetails key={view.index} view={view} actions={actions}/>:null;
 }
 
-export function TimelineRuler(){
-  const view=useSelector(state=>state.studioUi.editorTimeline);
-  if(!view)return null;
-  return <>{view.ticks.map(tick=><span key={tick.time} className="timeline-tick" style={{left:tick.left}}>{time(tick.time)}</span>)}</>;
-}
+function RulerContent({view}){return <>{view.ticks.map(tick=><span key={tick.time} className="timeline-tick" style={{left:tick.left}}>{time(tick.time)}</span>)}</>;}
+export function TimelineRuler(){const view=useSelector(state=>state.studioUi.editorTimeline);return view?<RulerContent view={view}/>:null;}
 
 function TimelineItem({item,scale}){
   if(item.boundary!=null)return <span className="scene-boundary" data-boundary={item.boundary} style={{left:item.start*scale}} title="Arrastra el corte entre tomas"/>;
@@ -44,10 +42,77 @@ function TimelineItem({item,scale}){
   </div>;
 }
 
-export function TimelineLane({lane}){
+function LaneContent({view,lane}){return <>{(view.lanes[lane]||[]).map(item=><TimelineItem key={item.key} item={item} scale={view.scale}/>)}</>;}
+export function TimelineLane({lane}){const view=useSelector(state=>state.studioUi.editorTimeline);return view?<LaneContent view={view} lane={lane}/>:null;}
+
+const laneRows=[['text-timeline','TEXTOS'],['timeline','VIDEO'],['effect-timeline','EFECTOS'],['transition-timeline','TRANS.'],['subtitle-timeline','SUBS'],['music-timeline','MÚSICA'],['sfx-timeline','SFX'],['audio-timeline','VOZ']];
+function TimelinePlayhead(){
+  const scale=useSelector(state=>state.studioUi.editorTimeline?.scale||1);
+  const previewTime=useSelector(state=>state.studioUi.previewControls?.time||0);
+  return <div id="timeline-playhead" className="timeline-playhead" style={{left:64+previewTime*scale}}/>;
+}
+
+export function TimelineView({actions}){
   const view=useSelector(state=>state.studioUi.editorTimeline);
+  const drag=useRef(null);
   if(!view)return null;
-  return <>{(view.lanes[lane]||[]).map(item=><TimelineItem key={item.key} item={item} scale={view.scale}/>)}</>;
+  const atTime=event=>pointerTime(event.clientX,event.currentTarget.getBoundingClientRect().left,view.scale);
+  const finish=event=>{
+    const current=drag.current;if(!current)return;
+    drag.current=null;
+    if(current.kind==='playhead'){
+      if(event.type==='pointerup')actions.seek(atTime(event));
+      if(current.resume)actions.resumeDrag();
+    }else if(current.started)actions.finishEdit();
+  };
+  const down=event=>{
+    if(event.button!==0)return;
+    event.preventDefault();window.getSelection()?.removeAllRanges();
+    const target=event.target,playhead=event.currentTarget.querySelector('#timeline-playhead')?.getBoundingClientRect();
+    const nearPlayhead=playhead&&Math.abs(event.clientX-(playhead.left+5))<=7;
+    const boundary=target.closest('[data-boundary]'),item=target.closest('[data-select-type]'),handle=target.closest('[data-trim-edge]');
+    if(nearPlayhead||target.closest('#timeline-playhead')){
+      drag.current={kind:'playhead',resume:actions.pauseForDrag()};actions.seek(atTime(event));
+    }else if(boundary){
+      const index=Number(boundary.dataset.boundary),range=actions.boundaryRange(index);
+      if(!range)return;
+      drag.current={kind:'boundary',index,...range,started:false,clientX:event.clientX};
+    }else if(handle&&item){
+      const type=item.dataset.selectType,index=Number(item.dataset.selectIndex);
+      if(!['text','subtitle'].includes(type))return;
+      actions.select(type,index,false);
+      drag.current={kind:'trim',type,index,edge:handle.dataset.trimEdge,started:false,clientX:event.clientX};
+    }else if(item){
+      const type=item.dataset.selectType,index=Number(item.dataset.selectIndex);
+      actions.select(type,index,event.shiftKey);
+      if(type==='text'&&!event.shiftKey){
+        const layer=view.lanes['text-timeline']?.[index];
+        if(layer)drag.current={kind:'text',index,start:layer.start,end:layer.end,clientX:event.clientX,started:false};
+      }
+    }else{drag.current={kind:'playhead',resume:actions.pauseForDrag()};actions.seek(atTime(event));}
+    if(drag.current)event.currentTarget.setPointerCapture(event.pointerId);
+  };
+  const move=event=>{
+    const current=drag.current;if(!current)return;
+    if(current.kind==='playhead'){actions.seek(atTime(event));return;}
+    if(!current.started&&Math.abs(event.clientX-current.clientX)<3)return;
+    if(!current.started){actions.beginEdit();current.started=true;}
+    if(current.kind==='text'){
+      const range=shiftTextRange(current.start,current.end,(event.clientX-current.clientX)/view.scale,view.duration);
+      actions.moveText(current.index,range);
+    }else if(current.kind==='boundary')actions.trimBoundary(current.index,boundaryTime(atTime(event),current.min,current.max));
+    else actions.trimCue(current.type,current.index,current.edge,atTime(event));
+  };
+  return <div className="timeline-content" style={{width:view.width}} onPointerDown={down} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish}>
+    <div className="timeline-ruler"><RulerContent view={view}/></div>
+    {laneRows.map(([id,label])=><div className="timeline-track" key={id}><b>{label}</b><div className="timeline-lane" style={{width:view.laneWidth}}><LaneContent view={view} lane={id}/></div></div>)}
+    <TimelinePlayhead/>
+  </div>;
+}
+
+export function HistoryControls({actions}){
+  const history=useSelector(state=>state.studioUi.editorHistory);
+  return <><button className="secondary" title="Deshacer · ⌘Z" disabled={!history?.canUndo} onClick={actions.undo}>↶</button><button className="secondary" title="Rehacer · ⌘⇧Z" disabled={!history?.canRedo} onClick={actions.redo}>↷</button><button className="primary" onClick={actions.save}>Guardar edición</button></>;
 }
 
 const effects=[['global','Usar secuencia global'],['none','Sin efecto'],['warm','Cálido'],['cool','Frío'],['mono','Monocromo'],['vivid','Vibrante'],['vintage','Vintage'],['contrast','Alto contraste'],['soft','Suave'],['fade','Deslavado'],['green','Verde cine'],['purple','Violeta']];
