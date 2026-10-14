@@ -1,10 +1,11 @@
 import {parseSrt,serializeSrt,mergeSrt,wordsToSrt,normalizeWordsPayload,promptList,renamedAsset,resolveChapters,validateSearchTerms,makeScenes,transitions,transitionLabels,migrateProjectTransitions,videoEffects,effectiveScene,transitionSeconds} from '/studio-core.mjs';
 import {prepareRemotionProject} from '/remotion-data.mjs';
 import {createEditorSession} from '/editor-session.mjs';
+import {exportView} from '/export-view.mjs';
 import '/remotion-player.js';
-import {renderGlobalSettings,renderFormatSettings,renderPreviewTransport,renderExportHistory,renderTranscriptPanel,renderProjectPanel,renderProjectOptions,renderAssetLibrary,renderChapterGroups,renderAutofillSequence,renderMissingSummary,renderStoryboard,renderStockCards,renderMediaPagination,renderSceneInspector,renderEditorTimeline,renderEditorHistory,renderEditorInspector,mountMediaPage,getMediaSession,patchMediaSession} from '/studio-ui.js';
+import {renderGlobalSettings,renderFormatSettings,renderPreviewTransport,renderExportPage,patchExportProgress,renderRenamePanel,renderTranscriptPanel,renderProjectPanel,renderProjectOptions,renderAssetLibrary,renderChapterGroups,renderAutofillSequence,renderMissingSummary,renderStoryboard,renderStockCards,renderMediaPagination,renderSceneInspector,renderEditorTimeline,renderEditorHistory,renderEditorInspector,mountMediaPage,getMediaSession,patchMediaSession} from '/studio-ui.js';
 mountMediaPage();
-const $=id=>document.getElementById(id), state={project:null,rename:null,pexels:[],pexelsPage:0,pexelsBatch:1,pexelsHasNext:false,storyblocks:[],storyblocksPage:0,storyblocksBatch:1,storyblocksTotal:0,google:[],googlePage:0,googleJobId:null,googleRejected:0,googleDetail:'',googleStatus:'',previewTime:0,previewPlaying:false,previewScene:-1,previewFrame:0,previewTick:0,previewSfx:null,previewSfxPlayed:new Set(),pexelsTargetScene:null,activeMediaScene:0,mediaProvider:'storyblocks',mediaType:'videos',mediaQuery:'',mediaSearched:false,mediaMissingOnly:false,pages:{assets:0,media:0,scenes:0},autofillStart:null,autofillDraftIndex:null,autofillRunning:false,exportRunning:false,timelineScale:null,busy:false,previewRendered:false,previewSnapshot:null,selectedScene:null,selection:null,multiSelection:[],segmentOverrideMode:false,previewToken:0};
+const $=id=>document.getElementById(id), state={project:null,rename:null,pexels:[],pexelsPage:0,pexelsBatch:1,pexelsHasNext:false,storyblocks:[],storyblocksPage:0,storyblocksBatch:1,storyblocksTotal:0,google:[],googlePage:0,googleJobId:null,googleRejected:0,googleDetail:'',googleStatus:'',previewTime:0,previewPlaying:false,previewScene:-1,previewFrame:0,previewTick:0,previewSfx:null,previewSfxPlayed:new Set(),pexelsTargetScene:null,activeMediaScene:0,mediaProvider:'storyblocks',mediaType:'videos',mediaQuery:'',mediaSearched:false,mediaMissingOnly:false,pages:{assets:0,media:0,scenes:0},autofillStart:null,autofillDraftIndex:null,autofillRunning:false,timelineScale:null,busy:false,previewRendered:false,previewSnapshot:null,selectedScene:null,selection:null,multiSelection:[],segmentOverrideMode:false,previewToken:0};
 // Bridge for controller actions while media interaction state lives in Redux.
 for(const [legacy,key] of Object.entries({activeMediaScene:'activeScene',mediaProvider:'provider',mediaType:'type',mediaQuery:'query',mediaSearched:'searched',mediaMissingOnly:'missingOnly',pexelsPage:'pexelsPage',storyblocksPage:'storyblocksPage',googlePage:'googlePage'})){
   delete state[legacy];Object.defineProperty(state,legacy,{get:()=>getMediaSession()[key],set:value=>patchMediaSession({[key]:value})});
@@ -14,8 +15,6 @@ const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>'
 const colorNames={yellow:'#ffe36c',cyan:'#73efff',pink:'#ff83bc',green:'#8ef7ae',white:'#ffffff'};
 const hexColor=(value,fallback='#ffffff')=>/^#[\da-f]{6}$/i.test(value||'')?value.toLowerCase():colorNames[value]||fallback;
 const fmt=n=>{n=Number(n)||0;return `${String(Math.floor(n/60)).padStart(2,'0')}:${String(Math.floor(n%60)).padStart(2,'0')}.${String(Math.round(n%1*1000)).padStart(3,'0')}`;};
-const formatElapsed=ms=>{const seconds=Math.max(0,Math.round(Number(ms)/1000)||0);return `${String(Math.floor(seconds/3600)).padStart(2,'0')}:${String(Math.floor(seconds/60)%60).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;};
-const exportReadyHtml=(project,result)=>`Video listo · Tiempo total de exportación: <strong>${formatElapsed(result.renderDurationMs)}</strong> · <a href="/api/studio/projects/${encodeURIComponent(project.id)}/files/${encodeURIComponent(result.name)}" download="${escape(project.title)}.mp4">Descargar MP4</a>`;
 const notice=(message,bad=false)=>{$('global-message').textContent=message;$('global-message').style.color=bad?'#ff8dab':'#78d7aa';};
 async function api(path,options={}){const response=await fetch(`/api/studio${path}`,options),data=await response.json().catch(()=>({}));if(!response.ok)throw Error(data.error||`Error ${response.status}`);return data;}
 const jsonOptions=value=>({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(value)});
@@ -30,7 +29,7 @@ function migrateLegacySources(p){
   if(p.scenes?.length===list.length)p.scenes.forEach((scene,i)=>{scene.searchTerm||=String(list[i].searchTerm);scene.chapterId=null;});
   return true;
 }
-async function openProject(id){if(state.project?.id!==id)await editorSession.flush();if(state.previewPlaying)setPreviewPlaying(false);window.clipStudioPlayer.unmount();state.previewTime=0;state.timelineScale=null;state.previewRendered=false;state.previewSnapshot=null;$('preview-empty').textContent='Crea el storyboard para visualizar el montaje.';$('preview-empty').hidden=false;$('preview-render-status').textContent='';state.selectedScene=null;state.selection=null;state.multiSelection=[];editorSession.reset();state.segmentOverrideMode=false;$('segment-effect-toggle').checked=false;state.pages={assets:0,media:0,scenes:0};state.autofillStart=null;state.autofillDraftIndex=null;state.autofillRunning=false;state.exportRunning=false;state.pexels=[];state.pexelsPage=0;state.pexelsBatch=1;state.pexelsHasNext=false;state.storyblocks=[];state.storyblocksPage=0;state.storyblocksBatch=1;state.storyblocksTotal=0;state.pexelsTargetScene=null;state.activeMediaScene=0;state.mediaProvider='storyblocks';state.mediaType='videos';state.mediaQuery='';state.mediaSearched=false;state.mediaMissingOnly=false;state.project=await api(`/projects/${id}`);state.mediaMissingOnly=missingMediaIndices().length>0;state.activeMediaScene=nextMissingScene(0);state.pages.media=state.mediaMissingOnly?0:Math.floor(Math.min(state.activeMediaScene,Math.max(0,state.project.scenes.length-1))/PAGE_SIZE);const migratedTransitions=migrateProjectTransitions(state.project);ensureEditorSettings(state.project);const migrated=migrateLegacySources(state.project);state.project.sourceCues??=state.project.cues?.map(x=>({...x}))||[];state.project.subtitleCues??=state.project.sourceCues.map(x=>({...x}));state.project.textLayers??=[];state.project.chapterGrouping??={};refreshChapterMapping(state.project);$('source-json').value=state.project.youtubeSources?JSON.stringify(state.project.youtubeSources,null,2):'';renderProject();if(migrated||migratedTransitions)await saveProject();if(state.mediaMissingOnly){document.querySelector('[data-view="assets"]').click();$('media-missing-summary').scrollIntoView({block:'start'});}notice(`Proyecto «${state.project.title}» abierto${migrated?' · search terms recuperados':''}${state.mediaMissingOnly?` · ${missingMediaIndices().length} escenas sin medio`:''}`);}
+async function openProject(id){if(state.project?.id!==id)await editorSession.flush();if(state.previewPlaying)setPreviewPlaying(false);window.clipStudioPlayer.unmount();state.previewTime=0;state.timelineScale=null;state.previewRendered=false;state.previewSnapshot=null;$('preview-empty').textContent='Crea el storyboard para visualizar el montaje.';$('preview-empty').hidden=false;$('preview-render-status').textContent='';state.selectedScene=null;state.selection=null;state.multiSelection=[];editorSession.reset();state.segmentOverrideMode=false;$('segment-effect-toggle').checked=false;state.pages={assets:0,media:0,scenes:0};state.autofillStart=null;state.autofillDraftIndex=null;state.autofillRunning=false;state.pexels=[];state.pexelsPage=0;state.pexelsBatch=1;state.pexelsHasNext=false;state.storyblocks=[];state.storyblocksPage=0;state.storyblocksBatch=1;state.storyblocksTotal=0;state.pexelsTargetScene=null;state.activeMediaScene=0;state.mediaProvider='storyblocks';state.mediaType='videos';state.mediaQuery='';state.mediaSearched=false;state.mediaMissingOnly=false;state.project=await api(`/projects/${id}`);state.mediaMissingOnly=missingMediaIndices().length>0;state.activeMediaScene=nextMissingScene(0);state.pages.media=state.mediaMissingOnly?0:Math.floor(Math.min(state.activeMediaScene,Math.max(0,state.project.scenes.length-1))/PAGE_SIZE);const migratedTransitions=migrateProjectTransitions(state.project);ensureEditorSettings(state.project);const migrated=migrateLegacySources(state.project);state.project.sourceCues??=state.project.cues?.map(x=>({...x}))||[];state.project.subtitleCues??=state.project.sourceCues.map(x=>({...x}));state.project.textLayers??=[];state.project.chapterGrouping??={};refreshChapterMapping(state.project);$('source-json').value=state.project.youtubeSources?JSON.stringify(state.project.youtubeSources,null,2):'';renderProject();if(migrated||migratedTransitions)await saveProject();if(state.mediaMissingOnly){document.querySelector('[data-view="assets"]').click();$('media-missing-summary').scrollIntoView({block:'start'});}notice(`Proyecto «${state.project.title}» abierto${migrated?' · search terms recuperados':''}${state.mediaMissingOnly?` · ${missingMediaIndices().length} escenas sin medio`:''}`);}
 function mediaOptions(type,selected){const list=(state.project?.assets||[]).filter(a=>type==='visual'?a.type==='image'||a.type==='video':type==='image'?a.type==='image':a.type==='audio');return `<option value="">${type==='visual'?'Sin medio':'Ninguno'}</option>`+list.map(a=>`<option value="${escape(a.id)}" ${a.id===selected?'selected':''}>${escape(a.name)}</option>`).join('');}
 function ensureEditorSettings(p){const settings=p.settings??={};const scenes=p.scenes||[];
   settings.transitionSequence??=[...new Set(scenes.map(s=>s.transition).filter(Boolean))];
@@ -48,7 +47,7 @@ function refreshChapterMapping(p,strict=false){
   try{p.chapters=resolveChapters(p.rawChapters,p.cues,p.script);}catch(error){p.chapterValidationError=error.message;if(strict)throw error;}
 }
 function sourceCount(value){return Array.isArray(value)?value.length:Array.isArray(value?.chapters)?value.chapters.length:Array.isArray(value?.items)?value.items.length:0;}
-function renderProject(){const p=state.project;$('project-indicator').textContent=p?p.title:'Sin proyecto';if(!p){renderProjectPanel(null,projectActions);renderTranscriptPanel(null,transcriptActions);renderAssetLibrary({projectId:'',items:[]},mediaActions);renderStoryboard({hasScenes:false},mediaActions);renderStockCards(null);renderChapterGroups({present:false,items:[]},mediaActions);renderAutofillSequence([],mediaActions);renderMissingSummary({items:[]},mediaActions);$('media-missing-summary').hidden=true;renderMediaPagination('assets',{pages:0,current:0,total:0},mediaActions);renderMediaPagination('media',{pages:0,current:0,total:0},mediaActions);return;}p.textLayers??=[];$('editor-project-name').textContent=p.title;
+function renderProject(){const p=state.project;$('project-indicator').textContent=p?p.title:'Sin proyecto';if(!p){renderProjectPanel(null,projectActions);renderTranscriptPanel(null,transcriptActions);renderAssetLibrary({projectId:'',items:[]},mediaActions);renderStoryboard({hasScenes:false},mediaActions);renderStockCards(null);renderChapterGroups({present:false,items:[]},mediaActions);renderAutofillSequence([],mediaActions);renderMissingSummary({items:[]},mediaActions);$('media-missing-summary').hidden=true;renderMediaPagination('assets',{pages:0,current:0,total:0},mediaActions);renderMediaPagination('media',{pages:0,current:0,total:0},mediaActions);renderExport();return;}p.textLayers??=[];$('editor-project-name').textContent=p.title;
   const voice=p.assets.find(a=>a.id===p.originalAudioId);
   renderProjectPanel({id:p.id,title:p.title,script:p.script||'',cues:p.cues?.length||0,chapters:p.chapters?.length||0,scenes:p.scenes?.length||0,assets:p.assets?.length||0,sourceCues:p.sourceCues?.length||0,words:p.wordsJson?.words?.length||0,voiceName:voice?.name||'',rawChapters:!!p.rawChapters,rawSearchTerms:!!p.rawSearchTerms},projectActions);
   const sourceNotes=[];if(p.chapterValidationError)sourceNotes.push(`Capítulos: ${p.chapterValidationError}`);else if(p.chapters?.length)sourceNotes.push(`${p.chapters.length} capítulos cubren ${p.chapters.reduce((n,ch)=>n+ch.cueCount,0)} bloques${p.chapters.some(ch=>ch.warning?.length)?' · algunos cierres se infirieron por el siguiente inicio':''}.`);
@@ -157,11 +156,7 @@ function renderInspector(){
   if(type==='voice'||type==='music')panel={type,narrationId:p.narrationId||null,musicId:p.musicId||null,musicVolume:p.settings?.musicVolume??20,assets:p.assets.filter(asset=>asset.type==='audio').map(asset=>({id:asset.id,name:asset.name}))};
   renderEditorInspector(panel,inspectorActions);
 }
-function renderExport(){const p=state.project;if(!p)return;const missing=p.scenes.filter(s=>!p.assets.some(a=>a.id===s.assetId)).length;const problems=[];if(!p.cues.length)problems.push('Falta el transcript SRT');if(!p.scenes.length)problems.push('Faltan escenas');if(missing)problems.push(`${missing} escenas sin asset`);const voice=p.assets.find(a=>a.id===p.narrationId);if(voice&&voice.duration+0.5<(p.scenes.at(-1)?.end||0))problems.push(`La narración termina ${(p.scenes.at(-1).end-voice.duration).toFixed(1)} s antes del video`);$('export-validation').innerHTML=`<div class="studio-item ${problems.length?'warn':'ok'}"><strong>${problems.length?problems.join(' · '):'Listo para exportar MP4'}</strong><small>${p.scenes.length} escenas · ${fmt(p.scenes.at(-1)?.end||0)} · ${p.settings?.ratio||'9:16'} · ${p.settings?.quality||'720p'}</small></div>`;$('export-mp4').disabled=!!problems.length;
-  const vertical=p.settings?.ratio!=='16:9',full=p.settings?.quality==='1080p'?1080:720,width=vertical?full:Math.round(full*16/9/2)*2,height=vertical?Math.round(full*16/9/2)*2:full;
-  const used=new Set(p.scenes.map(scene=>scene.assetId));const visuals=p.assets.filter(asset=>used.has(asset.id)&&(asset.type==='image'||asset.type==='video'));const small=visuals.filter(asset=>asset.width&&asset.height&&(asset.width<width||asset.height<height));
-  $('export-resolution-note').textContent=small.length?`${small.length} de ${visuals.length} medios visuales usados tienen menos de ${width}×${height} píxeles y se ampliarán. La exportación de alta calidad conserva mejor sus detalles, pero no puede crear detalle ausente en el original. Para máxima nitidez, usa medios de al menos ${width}×${height}.`:`Salida: ${width}×${height}. Calidad del MP4: ${{balanced:'Equilibrada',high:'Alta',maximum:'Máxima'}[p.settings?.exportQuality]||'Alta'}.`;
-  renderExportHistory(p);if(!state.exportRunning)$('render-status').innerHTML=p.exports?.[0]?.renderDurationMs!=null?exportReadyHtml(p,p.exports[0]):'';}
+function renderExport(){renderExportPage(exportView(state.project),exportActions);}
 const renderSnapshot=p=>JSON.stringify({scenes:p.scenes,assets:p.assets,cues:p.cues,subtitleCues:p.subtitleCues,textLayers:p.textLayers,words:p.wordsJson?.words,narrationId:p.narrationId,musicId:p.musicId,settings:p.settings});
 function sizePreviewStage(){
   const monitor=document.querySelector('.editor-monitor'),stage=$('preview-stage'),p=state.project;
@@ -205,7 +200,7 @@ async function setPreviewPlaying(value){
 }
 setInterval(()=>{if(!state.previewPlaying||!state.previewRendered)return;state.previewTime=window.clipStudioPlayer.frame()/30;if(!window.clipStudioPlayer.playing())state.previewPlaying=false;updatePreview();},100);
 async function uploadFiles(files){const p=requireProject();let index=0;for(const file of files){index++;if(!file.size)continue;updateBusy(Math.round(index/Math.max(1,files.length)*95),`Importando ${index}/${files.length}: ${file.name}`);const response=await fetch(`/api/studio/projects/${p.id}/assets?name=${encodeURIComponent(file.name)}`,{method:'POST',body:file});const item=await response.json();if(!response.ok)throw Error(item.error||`No se pudo importar ${file.name}`);p.assets.push(item);}renderProject();notice(`${files.length} archivo(s) importado(s)`);}
-async function followTask(t,target){const node=$(target);for(;;){const current=await api(`/projects/${state.project.id}/tasks/${t.id}`);node.textContent=`${current.progress}% · ${current.detail}${current.error?` · ${current.error}`:''}`;updateBusy(current.progress,current.detail);if(current.status!=='running'){if(current.status==='error')throw Error(current.error);state.project=await api(`/projects/${state.project.id}`);renderProject();return current.result;}await new Promise(resolve=>setTimeout(resolve,1500));}}
+async function followTask(t,target){const projectId=state.project.id,report=typeof target==='function'?target:message=>{$(target).textContent=message;};for(;;){const current=await api(`/projects/${projectId}/tasks/${t.id}`);if(state.project?.id===projectId)report(`${current.progress}% · ${current.detail}${current.error?` · ${current.error}`:''}`);updateBusy(current.progress,current.detail);if(current.status!=='running'){if(current.status==='error')throw Error(current.error);const project=await api(`/projects/${projectId}`);if(state.project?.id===projectId){state.project=project;renderProject();}return current.result;}await new Promise(resolve=>setTimeout(resolve,1500));}}
 function updateBusy(percent,detail){if(!state.busy)return;$('busy-bar').style.width=`${Math.max(0,Math.min(100,percent||0))}%`;$('busy-percent').textContent=percent?`${Math.round(percent)}%`:'';if(detail)$('busy-detail').textContent=detail;}
 function beginBusy(label){state.busy=true;$('busy-title').textContent=label||'Procesando…';$('busy-detail').textContent='Espera un momento.';$('busy-bar').style.width='0%';$('busy-percent').textContent='';$('busy-overlay').hidden=false;document.body.setAttribute('aria-busy','true');}
 function endBusy(){state.busy=false;$('busy-overlay').hidden=true;document.body.removeAttribute('aria-busy');}
@@ -254,39 +249,42 @@ for(const button of document.querySelectorAll('[data-download]'))button.onclick=
 $('spacing-run').onclick=withError(async()=>{if(state.previewPlaying)setPreviewPlaying(false);const p=requireProject();if(!p.narrationId)throw Error('Carga el audio original en Entradas');if(p.cues.length<2)throw Error('Se necesitan al menos dos bloques para ajustar pausas');const pauseMs=Number($('spacing-ms').value);if(!Number.isFinite(pauseMs)||pauseMs<0||pauseMs>5000)throw Error('La pausa debe estar entre 0 y 5000 ms');await saveProject();const task=await api(`/projects/${p.id}/adjust-audio`,jsonOptions({pauseMs}));const result=await followTask(task,'spacing-result');$('spacing-result').innerHTML=`${result.cuts} pausas recortadas · ${result.removed.toFixed(2)} s eliminados · <a href="/api/studio/projects/${p.id}/assets/${result.audioId}" download>Descargar WAV</a> · <a href="/api/studio/projects/${p.id}/files/${result.srt}" download>Descargar SRT</a>`;notice('Audio, timeline y subtítulos actualizados');});
 $('prompts-input').oninput=()=>{try{const raw=JSON.parse($('prompts-input').value),list=Array.isArray(raw)?raw:raw.beats||raw.items||[];const keys=[...new Set(list.flatMap(x=>Object.keys(x||{})))].filter(x=>x!=='id');$('prompts-field').innerHTML=keys.map(k=>`<option value="${escape(k)}" ${k==='prompt'?'selected':''}>${escape(k)}</option>`).join('')||'<option value="prompt">prompt</option>';}catch{}};
 $('prompts-run').onclick=withError(async()=>{$('prompts-output').value=promptList($('prompts-input').value,$('prompts-field').value);notice('Prompts formateados');});
-$('rename-folder').onclick=async()=>{try{
-  if(!window.showDirectoryPicker)throw Error('Este navegador no permite renombrar carpetas. Ábrelo en Chrome o Edge.');
-  state.rename=await window.showDirectoryPicker();
-  const files=[],targets=new Set();let scanned=0,duplicates=0;
-  for await(const [name,handle] of state.rename.entries()){
-    if(handle.kind!=='file')continue;
-    scanned++;
-    const target=renamedAsset(name);
-    if(!target)continue;
-    if(targets.has(target))duplicates++;
-    targets.add(target);files.push({name,target});
-  }
-  state.renameFiles=files;
-  $('rename-preview').textContent=files.length?`${files.length} archivos válidos encontrados entre ${scanned} archivos de la carpeta.${duplicates?` ${duplicates} nombres de destino duplicados; revisa la carpeta antes de renombrar.`:''}`:`No hay archivos con el patrón esperado entre ${scanned} archivos.`;
-  $('rename-run').disabled=!files.length||duplicates>0;
-}catch(error){notice(error.message,true);}};
-$('rename-run').onclick=withError(async()=>{
-  if(!state.rename||!state.renameFiles?.length)throw Error('Selecciona una carpeta');
-  const total=state.renameFiles.length;
-  updateBusy(0,`Comprobando ${total} destinos · faltan ${total}`);
-  for(const {target} of state.renameFiles){
-    try{await state.rename.getFileHandle(target);throw Error(`Ya existe ${target}`);}
-    catch(error){if(error.name!=='NotFoundError')throw error;}
-  }
-  for(const [index,{name,target}] of state.renameFiles.entries()){
-    const original=await state.rename.getFileHandle(name),file=await original.getFile();
-    const newHandle=await state.rename.getFileHandle(target,{create:true}),writer=await newHandle.createWritable();
-    await writer.write(file);await writer.close();await state.rename.removeEntry(name);
-    const done=index+1;updateBusy(Math.round(done/total*100),`Renombrados ${done} de ${total} · faltan ${total-done}`);
-  }
-  notice(`${total} assets renombrados`);$('rename-preview').textContent=`${total} archivos renombrados. 0 pendientes.`;
-  $('rename-run').disabled=true;state.renameFiles=[];
-});
+const renameActions={
+  async selectFolder(){try{
+    if(!window.showDirectoryPicker)throw Error('Este navegador no permite renombrar carpetas. Ábrelo en Chrome o Edge.');
+    const directory=await window.showDirectoryPicker();
+    const files=[],targets=new Set();let scanned=0,duplicates=0;
+    for await(const [name,handle] of directory.entries()){
+      if(handle.kind!=='file')continue;
+      scanned++;
+      const target=renamedAsset(name);
+      if(!target)continue;
+      if(targets.has(target))duplicates++;
+      targets.add(target);files.push({name,target});
+    }
+    state.rename=directory;state.renameFiles=files;
+    const message=files.length?`${files.length} archivos válidos encontrados entre ${scanned} archivos de la carpeta.${duplicates?` ${duplicates} nombres de destino duplicados; revisa la carpeta antes de renombrar.`:''}`:`No hay archivos con el patrón esperado entre ${scanned} archivos.`;
+    renderRenamePanel({count:files.length,duplicates,message},renameActions);
+  }catch(error){if(error.name!=='AbortError')notice(error.message,true);}},
+  run:withError(async()=>{
+    if(!state.rename||!state.renameFiles?.length)throw Error('Selecciona una carpeta');
+    const total=state.renameFiles.length;
+    updateBusy(0,`Comprobando ${total} destinos · faltan ${total}`);
+    for(const {target} of state.renameFiles){
+      try{await state.rename.getFileHandle(target);throw Error(`Ya existe ${target}`);}
+      catch(error){if(error.name!=='NotFoundError')throw error;}
+    }
+    for(const [index,{name,target}] of state.renameFiles.entries()){
+      const original=await state.rename.getFileHandle(name),file=await original.getFile();
+      const newHandle=await state.rename.getFileHandle(target,{create:true}),writer=await newHandle.createWritable();
+      await writer.write(file);await writer.close();await state.rename.removeEntry(name);
+      const done=index+1;updateBusy(Math.round(done/total*100),`Renombrados ${done} de ${total} · faltan ${total-done}`);
+    }
+    notice(`${total} assets renombrados`);
+    state.renameFiles=[];renderRenamePanel({count:0,duplicates:0,message:`${total} archivos renombrados. 0 pendientes.`},renameActions);
+  })
+};
+renderRenamePanel({count:0,duplicates:0,message:''},renameActions);
 const editorActions={
   change(index,field,value){const scene=state.project?.scenes[index];if(!scene)return;rememberEdit();scene[field]=value;renderScenes();renderMediaBoard();updatePreview(true);markEditorDirty();},
   upload(index,files){return withError(async()=>{if(state.selectedScene!==index)return;await receiveInput('inspector-upload',files);})();},
@@ -394,10 +392,13 @@ const previewActions={play:withError(async()=>{requireProject();await setPreview
 renderPreviewTransport({time:0,duration:0,playing:false},previewActions);
 $('timeline-zoom').oninput=e=>{state.timelineScale=Number(e.target.value);renderTimeline();};
 $('preview-render').onclick=withError(async()=>{requireProject();state.previewSnapshot=null;updatePreview(true);notice('Composición actualizada');});
-$('export-mp4').onclick=withError(async()=>{const p=requireProject(),clickedAt=performance.now();state.exportRunning=true;$('render-status').textContent='Preparando exportación…';try{await saveProject();const t=await api(`/projects/${p.id}/render`,jsonOptions({requestElapsedMs:Math.round(performance.now()-clickedAt)}));await followTask(t,'render-status');state.exportRunning=false;renderExport();notice('Exportación terminada');}catch(error){$('render-status').textContent=`Error: ${error.message}`;throw error;}finally{state.exportRunning=false;}});
-$('export-json').onclick=withError(async()=>download(JSON.stringify(requireProject(),null,2),`${state.project.title}.json`,'application/json'));
-$('export-srt').onclick=withError(async()=>download(serializeSrt(requireProject().subtitleCues?.length?state.project.subtitleCues:state.project.cues),`${state.project.title}.srt`));
-$('export-capcut').onclick=withError(async()=>{const p=requireProject();await saveProject();const t=await api(`/projects/${p.id}/capcut`,jsonOptions({}));const result=await followTask(t,'capcut-status');$('capcut-status').innerHTML=`Proyecto preparado: <a href="/api/studio/projects/${p.id}/files/${result.name}" download>Descargar ZIP CapCut</a> · ${result.scenes} escenas.`;notice('Paquete CapCut preparado');});
+const exportActions={
+  startMp4:withError(async()=>{const p=requireProject(),clickedAt=performance.now();patchExportProgress({running:true,mp4:'Preparando exportación…'});try{await saveProject();const t=await api(`/projects/${p.id}/render`,jsonOptions({requestElapsedMs:Math.round(performance.now()-clickedAt)}));await followTask(t,message=>patchExportProgress({mp4:message}));patchExportProgress({running:false,mp4:''});renderExport();notice('Exportación terminada');}catch(error){patchExportProgress({running:false,mp4:`Error: ${error.message}`});throw error;}}),
+  downloadJson:withError(async()=>download(JSON.stringify(requireProject(),null,2),`${state.project.title}.json`,'application/json')),
+  downloadSrt:withError(async()=>download(serializeSrt(requireProject().subtitleCues?.length?state.project.subtitleCues:state.project.cues),`${state.project.title}.srt`)),
+  prepareCapcut:withError(async()=>{const p=requireProject();patchExportProgress({capcutRunning:true,capcut:'Preparando proyecto CapCut…',capcutResult:null});try{await saveProject();const t=await api(`/projects/${p.id}/capcut`,jsonOptions({}));const result=await followTask(t,message=>patchExportProgress({capcut:message}));patchExportProgress({capcutRunning:false,capcut:'',capcutResult:result});notice('Paquete CapCut preparado');}catch(error){patchExportProgress({capcutRunning:false,capcut:`Error: ${error.message}`});throw error;}})
+};
+renderExport();
 loadProjects().catch(error=>notice(error.message,true));
 
 
