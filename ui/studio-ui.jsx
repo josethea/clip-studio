@@ -3,19 +3,21 @@ import {createRoot} from 'react-dom/client';
 import {flushSync} from 'react-dom';
 import {Provider, useSelector} from 'react-redux';
 import {configureStore, createSlice} from '@reduxjs/toolkit';
-import {transitions, transitionLabels} from '../studio-core.mjs';
 import {TranscriptApp} from './transcript.jsx';
 import {ProjectApp} from './project.jsx';
 import {AssetLibrary, ChapterGrouping, AutofillEntries, MissingMediaSummary, MediaBoard, MediaPagination} from './media.jsx';
 import {MediaPage} from './media-page.jsx';
 import {SceneInspector, TimelineRuler, TimelineLane, EffectInspector, TransitionInspector, SfxInspector, AudioInspector} from './editor.jsx';
 import {TextInspector,SubtitleInspector,MultiInspector} from './editor-text.jsx';
+import {GlobalControls,FormatControls,PreviewControls} from './editor-controls.jsx';
 
 const uiSlice=createSlice({
   name:'studioUi',
-  initialState:{transitionSequence:['remotion:none'],projectId:null,projectTitle:'',exports:[],transcript:null,project:null,projects:[],mediaAssets:null,mediaChapters:null,autofillEntries:[],mediaMissing:null,mediaBoard:null,mediaStock:null,mediaPagination:{assets:null,media:null},mediaSession:{activeScene:0,provider:'storyblocks',type:'videos',query:'',searched:false,missingOnly:false,pexelsPage:0,storyblocksPage:0,googlePage:0},editorScene:null,editorTimeline:null,editorInspector:null},
+  initialState:{globalControls:null,formatControls:null,previewControls:null,projectId:null,projectTitle:'',exports:[],transcript:null,project:null,projects:[],mediaAssets:null,mediaChapters:null,autofillEntries:[],mediaMissing:null,mediaBoard:null,mediaStock:null,mediaPagination:{assets:null,media:null},mediaSession:{activeScene:0,provider:'storyblocks',type:'videos',query:'',searched:false,missingOnly:false,pexelsPage:0,storyblocksPage:0,googlePage:0},editorScene:null,editorTimeline:null,editorInspector:null},
   reducers:{
-    showTransitions(state,action){state.transitionSequence=action.payload;},
+    showGlobalControls(state,action){state.globalControls=action.payload;},
+    showFormatControls(state,action){state.formatControls=action.payload;},
+    showPreviewControls(state,action){state.previewControls=action.payload;},
     showExports(state,action){Object.assign(state,action.payload);},
     showTranscript(state,action){state.transcript=action.payload;},
     showProject(state,action){state.project=action.payload;},
@@ -40,11 +42,6 @@ function root(id){
   return roots.get(id);
 }
 
-const TransitionPicker=memo(function TransitionPicker({onToggle}){
-  const selected=useSelector(state=>state.studioUi.transitionSequence);
-  return <>{transitions.map(id=><button key={id} type="button" className={`choice-chip ${selected.includes(id)?'active':''}`} aria-pressed={selected.includes(id)} onClick={()=>onToggle(id)}>{transitionLabels[id]||id}</button>)}</>;
-});
-
 const ExportHistory=memo(function ExportHistory(){
   const {projectId,projectTitle,exports}=useSelector(state=>state.studioUi);
   if(!projectId||!exports.length)return <div className="studio-item">Aún no hay exportaciones.</div>;
@@ -60,9 +57,17 @@ const ExportHistory=memo(function ExportHistory(){
 function formatTime(value){const n=Number(value)||0;return `${String(Math.floor(n/60)).padStart(2,'0')}:${String(Math.floor(n%60)).padStart(2,'0')}.${String(Math.round(n%1*1000)).padStart(3,'0')}`;}
 function formatElapsed(value){const n=Math.max(0,Math.round(Number(value)/1000)||0);return `${String(Math.floor(n/3600)).padStart(2,'0')}:${String(Math.floor(n/60)%60).padStart(2,'0')}:${String(n%60).padStart(2,'0')}`;}
 
-export function renderTransitionPicker(sequence,onToggle){
-  store.dispatch(uiSlice.actions.showTransitions([...sequence]));
-  root('global-transitions').render(<Provider store={store}><TransitionPicker onToggle={onToggle}/></Provider>);
+export function renderGlobalSettings(view,actions){
+  store.dispatch(uiSlice.actions.showGlobalControls(view));
+  if(!roots.has('global-controls'))root('global-controls').render(<Provider store={store}><GlobalControls actions={actions}/></Provider>);
+}
+export function renderFormatSettings(view,actions){
+  store.dispatch(uiSlice.actions.showFormatControls(view));
+  if(!roots.has('format-controls'))root('format-controls').render(<Provider store={store}><FormatControls actions={actions}/></Provider>);
+}
+export function renderPreviewTransport(view,actions){
+  store.dispatch(uiSlice.actions.showPreviewControls(view));
+  if(!roots.has('preview-controls'))root('preview-controls').render(<Provider store={store}><PreviewControls actions={actions}/></Provider>);
 }
 
 export function renderExportHistory(project){
