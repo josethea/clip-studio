@@ -5,9 +5,11 @@ import {Provider} from 'react-redux';
 import {configureStore, createSlice} from '@reduxjs/toolkit';
 import {TranscriptApp} from './transcript.jsx';
 import {ProjectApp} from './project.jsx';
-import {AssetLibrary, ChapterGrouping, AutofillEntries, MissingMediaSummary, MediaBoard, MediaPagination} from './media.jsx';
+import {AssetLibrary, AssetTarget, ChapterGrouping, AutofillControls, AutofillReviewButton, MissingMediaSummary, MediaBoard, MediaPagination, YoutubeSources} from './media.jsx';
 import {MediaPage} from './media-page.jsx';
 import {SceneInspector, TimelineView, HistoryControls, EffectInspector, TransitionInspector, SfxInspector, AudioInspector} from './editor.jsx';
+import {SceneExtraControls,TemplatePanel,EditorMediaPicker} from './editor-extras.jsx';
+import {NarrationControls,EditorStoryboardControls,MediaStoryboardControls,TimelineToolbar,MonitorActions,EmptyInspector} from './editor-workflow.jsx';
 import {TextInspector,SubtitleInspector,MultiInspector} from './editor-text.jsx';
 import {GlobalControls,FormatControls,PreviewControls} from './editor-controls.jsx';
 import {ExportPage} from './export.jsx';
@@ -16,7 +18,7 @@ import {GeminiPanel,KeysPanel,PromptsPanel} from './sidebar-tools.jsx';
 
 const uiSlice=createSlice({
   name:'studioUi',
-  initialState:{globalControls:null,formatControls:null,previewControls:null,editorHistory:{canUndo:false,canRedo:false},exportView:{projectId:null,title:'',problems:['Crea o abre un proyecto'],summary:'',resolutionNote:'',exports:[],ready:null},exportProgress:{mp4:'',running:false,capcut:'',capcutRunning:false,capcutResult:null},renameView:{count:0,duplicates:0,message:''},transcript:null,project:null,projects:[],mediaAssets:null,mediaChapters:null,autofillEntries:[],mediaMissing:null,mediaBoard:null,mediaStock:null,mediaPagination:{assets:null,media:null},mediaSession:{activeScene:0,provider:'storyblocks',type:'videos',query:'',searched:false,missingOnly:false,pexelsPage:0,storyblocksPage:0,googlePage:0},editorScene:null,editorTimeline:null,editorInspector:null},
+  initialState:{globalControls:null,formatControls:null,previewControls:null,editorHistory:{canUndo:false,canRedo:false},exportView:{projectId:null,title:'',problems:['Crea o abre un proyecto'],summary:'',resolutionNote:'',exports:[],ready:null},exportProgress:{mp4:'',running:false,capcut:'',capcutRunning:false,capcutResult:null},renameView:{count:0,duplicates:0,message:''},transcript:null,project:null,projects:[],mediaAssets:null,mediaTarget:{selected:null,scenes:[]},mediaChapters:null,mediaAutofill:{projectId:null,sceneCount:0,entries:[],start:1,running:false,remaining:0,missingOnly:false,requirements:'',canRun:false},autofillProgress:{visible:false,percent:0,status:''},youtubeSources:{projectId:null,json:''},mediaMissing:null,mediaBoard:null,mediaStock:null,mediaPagination:{assets:null,media:null},mediaSession:{activeScene:0,assetTargetScene:null,provider:'storyblocks',type:'videos',query:'',searched:false,missingOnly:false,pexelsPage:0,storyblocksPage:0,googlePage:0},editorScene:null,editorSceneExtras:null,editorTemplates:[],editorMediaPicker:null,editorNarration:null,editorStoryboard:null,editorTimeline:null,editorInspector:null},
   reducers:{
     showGlobalControls(state,action){state.globalControls=action.payload;},
     showFormatControls(state,action){state.formatControls=action.payload;},
@@ -28,14 +30,22 @@ const uiSlice=createSlice({
     showProject(state,action){state.project=action.payload;},
     showProjects(state,action){state.projects=action.payload;},
     showMediaAssets(state,action){state.mediaAssets=action.payload;},
+    showMediaTarget(state,action){state.mediaTarget=action.payload;},
     showMediaChapters(state,action){state.mediaChapters=action.payload;},
-    showAutofillEntries(state,action){state.autofillEntries=action.payload;},
+    showAutofill(state,action){if(state.mediaAutofill.projectId!==action.payload.projectId)state.autofillProgress={visible:false,percent:0,status:''};state.mediaAutofill=action.payload;},
+    patchAutofillProgress(state,action){Object.assign(state.autofillProgress,action.payload);},
+    showYoutubeSources(state,action){state.youtubeSources=action.payload;},
     showMediaMissing(state,action){state.mediaMissing=action.payload;},
     showMediaBoard(state,action){state.mediaBoard=action.payload;},
     showMediaStock(state,action){state.mediaStock=action.payload;},
     showMediaPagination(state,action){state.mediaPagination[action.payload.kind]=action.payload.view;},
     patchMediaSession(state,action){Object.assign(state.mediaSession,action.payload);},
     showEditorScene(state,action){state.editorScene=action.payload;},
+    showEditorSceneExtras(state,action){state.editorSceneExtras=action.payload;},
+    showEditorTemplates(state,action){state.editorTemplates=action.payload;},
+    showEditorMediaPicker(state,action){state.editorMediaPicker=action.payload;},
+    showEditorNarration(state,action){state.editorNarration=action.payload;},
+    showEditorStoryboard(state,action){state.editorStoryboard=action.payload;},
     showEditorTimeline(state,action){state.editorTimeline=action.payload;},
     showEditorHistory(state,action){state.editorHistory=action.payload;},
     showEditorInspector(state,action){state.editorInspector=action.payload;}
@@ -95,8 +105,18 @@ function renderMediaIsland(id,action,payload,Component,actions){
   root(id).render(<Provider store={store}><Component actions={actions}/></Provider>);
 }
 export const renderAssetLibrary=(view,actions)=>renderMediaIsland('asset-list',uiSlice.actions.showMediaAssets,view,AssetLibrary,actions);
+export const renderAssetTarget=(view,actions)=>renderMediaIsland('media-target-scene',uiSlice.actions.showMediaTarget,view,AssetTarget,actions);
 export const renderChapterGroups=(view,actions)=>renderMediaIsland('chapter-grouping',uiSlice.actions.showMediaChapters,view,ChapterGrouping,actions);
-export const renderAutofillSequence=(entries,actions)=>renderMediaIsland('autofill-sequence',uiSlice.actions.showAutofillEntries,entries,AutofillEntries,actions);
+export function renderAutofillPanel(view,actions){
+  store.dispatch(uiSlice.actions.showAutofill(view));
+  if(!roots.has('autofill-app'))root('autofill-app').render(<Provider store={store}><AutofillControls key={view.projectId||'none'} actions={actions}/></Provider>);
+  if(!roots.has('autofill-missing'))root('autofill-missing').render(<Provider store={store}><AutofillReviewButton actions={actions}/></Provider>);
+}
+export function patchAutofillProgress(patch){store.dispatch(uiSlice.actions.patchAutofillProgress(patch));}
+export function renderYoutubeSources(view,actions){
+  store.dispatch(uiSlice.actions.showYoutubeSources(view));
+  root('youtube-sources').render(<Provider store={store}><YoutubeSources key={view.draftKey||'none'} actions={actions}/></Provider>);
+}
 export const renderMissingSummary=(view,actions)=>renderMediaIsland('media-missing-summary',uiSlice.actions.showMediaMissing,view,MissingMediaSummary,actions);
 export const renderStoryboard=(view,actions)=>renderMediaIsland('media-board',uiSlice.actions.showMediaBoard,view,MediaBoard,actions);
 export function renderMediaPagination(kind,view,actions){
@@ -108,9 +128,26 @@ export function mountMediaPage(){flushSync(()=>root('assets').render(<MediaPage/
 export function getMediaSession(){return store.getState().studioUi.mediaSession;}
 export function patchMediaSession(patch){store.dispatch(uiSlice.actions.patchMediaSession(patch));}
 export function renderSceneInspector(view,actions){renderMediaIsland('scene-list',uiSlice.actions.showEditorScene,view,SceneInspector,actions);}
+export function renderSceneExtras(view,actions){renderMediaIsland('scene-extra-controls',uiSlice.actions.showEditorSceneExtras,view,SceneExtraControls,actions);}
+export function renderTemplatePanel(view,actions){renderMediaIsland('template-panel',uiSlice.actions.showEditorTemplates,view,TemplatePanel,actions);}
+export function renderEditorMediaPicker(view,actions){
+  store.dispatch(uiSlice.actions.showEditorMediaPicker(view));
+  flushSync(()=>root('media-picker-app').render(<Provider store={store}><EditorMediaPicker actions={actions}/></Provider>));
+}
+export function mountEditorButtons(actions){
+  root('monitor-actions').render(<MonitorActions actions={actions}/>);
+  root('inspector-empty').render(<EmptyInspector actions={actions}/>);
+}
+export function renderNarrationPanel(view,actions){renderMediaIsland('narration-controls',uiSlice.actions.showEditorNarration,view,NarrationControls,actions);}
+export function renderStoryboardSettings(view,actions){
+  store.dispatch(uiSlice.actions.showEditorStoryboard(view));
+  if(!roots.has('editor-storyboard-controls'))root('editor-storyboard-controls').render(<Provider store={store}><EditorStoryboardControls actions={actions}/></Provider>);
+  if(!roots.has('media-storyboard-controls'))root('media-storyboard-controls').render(<Provider store={store}><MediaStoryboardControls actions={actions}/></Provider>);
+}
 export function renderEditorTimeline(view,actions){
   store.dispatch(uiSlice.actions.showEditorTimeline(view));
   if(!roots.has('timeline-root'))root('timeline-root').render(<Provider store={store}><TimelineView actions={actions}/></Provider>);
+  if(!roots.has('timeline-toolbar'))root('timeline-toolbar').render(<Provider store={store}><TimelineToolbar actions={actions}/></Provider>);
 }
 export function renderEditorHistory(view,actions){
   store.dispatch(uiSlice.actions.showEditorHistory(view));

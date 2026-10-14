@@ -36,6 +36,23 @@ test('page clicks during a batch download do not overwrite the page being loaded
   assert.equal(state.pexelsPage,2);
 });
 
+test('a previous page download does not block paging after a new search',async()=>{
+  let release;
+  let oldBatch=false;
+  const {search,state}=setup({searchPexels:({query,page})=>{
+    if(query==='old'&&page===2)return new Promise(resolve=>{release=()=>resolve({items:photos(8,8),hasNext:false});});
+    return {items:photos(query==='old'?0:20,8),hasNext:true};
+  }});
+  state.query='old';await search.run('project-1',0);await search.page('project-1',1);
+  const stale=search.page('project-1',1).then(()=>{oldBatch=true;});
+  state.query='new';await search.run('project-1',0);
+  await search.page('project-1',1);
+  assert.equal(state.pexelsPage,1);
+  release();await stale;
+  assert.equal(oldBatch,true);
+  assert.equal(search.item('pexels',0).id,20);
+});
+
 test('a reset drops responses from searches started for the previous scene',async()=>{
   let release;
   const {search,state}=setup({searchPexels:()=>new Promise(resolve=>{release=resolve;})});
@@ -45,6 +62,16 @@ test('a reset drops responses from searches started for the previous scene',asyn
   await pending;
   assert.equal(state.searched,false);
   assert.equal(search.item('pexels',0),undefined);
+});
+
+test('a second search ignores a slower response from the first query',async()=>{
+  let release;
+  const {search,state}=setup({searchPexels:({query})=>query==='old'?new Promise(resolve=>{release=()=>resolve({items:photos(0,5),hasNext:false});}):{items:photos(10,5),hasNext:false}});
+  state.query='old';const first=search.run('project-1',0);
+  state.query='new';await search.run('project-1',0);
+  release();await first;
+  assert.equal(search.item('pexels',0).id,10);
+  assert.equal(state.searched,true);
 });
 
 test('Google jobs stop polling once the job is done and report empty results',async()=>{

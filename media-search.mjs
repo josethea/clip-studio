@@ -5,9 +5,10 @@ const emptyResults=()=>({pexels:[],pexelsBatch:1,pexelsHasNext:false,storyblocks
 const pageKey={pexels:'pexelsPage',storyblocks:'storyblocksPage',google:'googlePage'};
 
 export function createStockSearch({service,getSession,patchSession,onChange,notice,isCurrentProject,schedule=(fn,ms)=>setTimeout(fn,ms)}){
-  let results=emptyResults(),generation=0,loadingPage=false;
+  let results=emptyResults(),generation=0,loadingPageGeneration=null;
   const list=provider=>provider==='pexels'?results.pexels:provider==='google'?results.google:results.storyblocks;
   const query=()=>{const value=String(getSession().query||'').trim();if(!value)throw Error('Escribe un término de búsqueda');return value;};
+  const reset=()=>{generation++;results=emptyResults();};
 
   async function searchPexels(batch){
     const run=generation,result=await service.searchPexels({query:query(),type:getSession().type,page:batch});
@@ -44,10 +45,13 @@ export function createStockSearch({service,getSession,patchSession,onChange,noti
 
   return {
     // Drops results and ignores responses from searches started before the reset.
-    reset(){generation++;results=emptyResults();},
+    reset,
     item(provider,index){return list(provider)[index];},
     get googleJobId(){return results.googleJobId;},
     async run(projectId,sceneIndex){
+      // A new search supersedes an in-flight request, even for the same provider.
+      reset();
+      patchSession({searched:false,pexelsPage:0,storyblocksPage:0,googlePage:0});onChange();
       const provider=getSession().provider;
       if(provider==='storyblocks'){patchSession({storyblocksPage:0});await searchStoryblocks(projectId,1);}
       else if(provider==='google')await searchGoogle(projectId,sceneIndex);
@@ -55,15 +59,15 @@ export function createStockSearch({service,getSession,patchSession,onChange,noti
     },
     async page(projectId,direction){
       // Page clicks while the next batch downloads would be overwritten when it arrives.
-      if(loadingPage)return;
+      if(loadingPageGeneration===generation)return;
       const session=getSession(),provider=session.provider,current=session[pageKey[provider]]||0;
       if(provider==='google'){patchSession({googlePage:Math.max(0,Math.min(Math.ceil(results.google.length/STOCK_PAGE_SIZE)-1,current+direction))});onChange();return;}
       const next=current+direction;if(next<0)return;
       const run=generation;
       if(next*STOCK_PAGE_SIZE>=list(provider).length){
-        loadingPage=true;
+        loadingPageGeneration=run;
         try{if(provider==='pexels')await searchPexels(results.pexelsBatch+1);else await searchStoryblocks(projectId,results.storyblocksBatch+1);}
-        finally{loadingPage=false;}
+        finally{if(loadingPageGeneration===run)loadingPageGeneration=null;}
       }
       if(run!==generation)return;
       patchSession({[pageKey[provider]]:next});onChange();

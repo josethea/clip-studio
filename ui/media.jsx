@@ -16,6 +16,14 @@ export function AssetLibrary({actions}){
   })}</>;
 }
 
+export function AssetTarget({actions}){
+  const view=useSelector(state=>state.studioUi.mediaTarget);
+  return <label>Escena de destino<select value={view?.selected==null?'':String(view.selected)} onChange={event=>actions.targetScene(event.target.value===''?null:Number(event.target.value))}>
+    <option value="">Solo guardar en biblioteca</option>
+    {(view?.scenes||[]).map(scene=><option key={scene.index} value={scene.index}>Asset {scene.index+1} · bloques {scene.cueStart+1}–{scene.cueEnd+1}</option>)}
+  </select></label>;
+}
+
 export function ChapterGrouping({actions}){
   const view=useSelector(state=>state.studioUi.mediaChapters);
   if(!view?.present)return null;
@@ -25,9 +33,35 @@ export function ChapterGrouping({actions}){
   </>;
 }
 
-export function AutofillEntries({actions}){
-  const entries=useSelector(state=>state.studioUi.autofillEntries);
-  return <>{entries.map((entry,index)=><div className="autofill-entry" key={index}><span className="autofill-entry-number">{index+1}</span><strong>{entry.type==='videos'?'Video':'Imagen'} · {{google:'Google Images',storyblocks:'Storyblocks',pexels:'Pexels'}[entry.provider]||entry.provider}</strong><button type="button" className="secondary" onClick={()=>actions.editAutofill(index)}>Editar</button><button type="button" className="secondary danger" onClick={()=>actions.removeAutofill(index)}>Eliminar</button></div>)}</>;
+export function AutofillReviewButton({actions}){
+  const view=useSelector(state=>state.studioUi.mediaAutofill);
+  if(!view?.sceneCount||!view.remaining)return null;
+  return <button className="secondary" type="button" onClick={()=>actions.toggleMissing()}>{view.missingOnly?'Mostrar storyboard completo':`Ver bloques sin medio (${view.remaining})`}</button>;
+}
+
+export function AutofillControls({actions}){
+  const view=useSelector(state=>state.studioUi.mediaAutofill);
+  const progress=useSelector(state=>state.studioUi.autofillProgress);
+  const [draft,setDraft]=useState(null);
+  const [saving,setSaving]=useState(false);
+  const [error,setError]=useState('');
+  const entries=view?.entries||[];
+  const names={google:'Google Images',storyblocks:'Storyblocks',pexels:'Pexels'};
+  const begin=(index)=>{const entry=entries[index];setDraft(index===-1?{index,type:'photos',provider:'google'}:{index,type:entry.type,provider:entry.provider});setError('');};
+  const save=async()=>{
+    if(!draft||saving)return;
+    setSaving(true);setError('');
+    try{await actions.saveAutofill(draft);setDraft(null);}
+    catch(cause){setError(cause.message);}
+    finally{setSaving(false);}
+  };
+  return <div className="autofill-inline"><h3>COMPLETAR MEDIOS FALTANTES</h3><p className="studio-help">Configura una secuencia de imágenes y videos. Se repite hasta cubrir los bloques pendientes. Google Images usa la primera imagen apta de un máximo de 10 candidatas.</p>
+    <div className="autofill-head"><label>Desde escena #<input type="number" min="1" max={Math.max(1,(view?.sceneCount||0)+1)} value={view?.start??1} onChange={event=>actions.autofillStart(event.target.value)} disabled={view?.running}/></label><button className="secondary" type="button" disabled={!view?.projectId||view?.running||entries.length>=40} onClick={()=>begin(-1)}>+ Agregar fuente</button></div>
+    <div className="autofill-sequence">{entries.map((entry,index)=><div className="autofill-entry" key={index}><span className="autofill-entry-number">{index+1}</span><strong>{entry.type==='videos'?'Video':'Imagen'} · {names[entry.provider]||entry.provider}</strong><button type="button" className="secondary" disabled={view?.running||saving} onClick={()=>begin(index)}>Editar</button><button type="button" className="secondary danger" disabled={view?.running||saving} onClick={()=>{setDraft(null);actions.removeAutofill(index);}}>Eliminar</button></div>)}</div>
+    {draft&&<div className="autofill-editor"><div className="studio-grid two"><label>Tipo<select value={draft.type} onChange={event=>setDraft({...draft,type:event.target.value,provider:event.target.value==='videos'&&draft.provider==='google'?'storyblocks':draft.provider})}><option value="photos">Imagen</option><option value="videos">Video</option></select></label><label>Fuente<select value={draft.provider} onChange={event=>setDraft({...draft,provider:event.target.value})}><option value="google" disabled={draft.type==='videos'}>Google Images</option><option value="storyblocks">Storyblocks</option><option value="pexels">Pexels</option></select></label></div><div className="studio-actions"><button className="primary" type="button" disabled={saving||view?.running} onClick={save}>Guardar fuente</button><button className="secondary" type="button" disabled={saving} onClick={()=>{setDraft(null);setError('');}}>Cancelar</button></div>{error&&<p className="studio-help" role="alert">{error}</p>}</div>}
+    {!!entries.length&&<button className="secondary" id="autofill-run" type="button" disabled={!view?.canRun} onClick={()=>actions.runAutofill()}>Buscar medios faltantes</button>}
+    <p className="studio-help">{view?.requirements||''}</p><p className="studio-help" role="status">{progress?.status||''}</p>{progress?.visible&&<div className="autofill-progress"><div style={{width:`${Math.max(0,Math.min(100,progress.percent||0))}%`}}/></div>}
+  </div>;
 }
 
 export function MissingMediaSummary({actions}){
@@ -87,4 +121,20 @@ export function MediaPagination({kind,actions}){
     {indexes.map(page=>{const gap=page-previous>1;previous=page;return <React.Fragment key={page}>{gap&&<span>…</span>}<button className={page===view.current?'active':''} onClick={()=>actions.page(kind,page)}>{page+1}</button></React.Fragment>;})}
     <button disabled={view.current===view.pages-1} onClick={()=>actions.page(kind,view.current+1)}>›</button><span>{view.current*15+1}–{Math.min(view.total,(view.current+1)*15)} de {view.total}</span>
   </>;
+}
+
+export function YoutubeSources({actions}){
+  const view=useSelector(state=>state.studioUi.youtubeSources);
+  const [json,setJson]=useState(view?.json||'');
+  const [duration,setDuration]=useState('5');
+  const [delay,setDelay]=useState('12');
+  const [start,setStart]=useState('1');
+  const [cookieBrowser,setCookieBrowser]=useState('none');
+  const [running,setRunning]=useState(false);
+  const [status,setStatus]=useState('');
+  return <article className="panel"><h2>VIDEOS DE YOUTUBE POR CAPÍTULO</h2><p className="studio-help">Este JSON es independiente de los capítulos del guion. Usa <code>name</code> y <code>urls</code> para descargar, cortar, aplicar espejo y eliminar el audio. Puedes reanudar desde un número de video.</p>
+    <label>Capítulos y enlaces de YouTube<textarea rows="7" value={json} onChange={event=>setJson(event.target.value)} placeholder='[{"name":"Capítulo 1","urls":["https://www.youtube.com/watch?v=..."]}]'/></label>
+    <div className="studio-grid four"><label>Clip (s)<input type="number" value={duration} onChange={event=>setDuration(event.target.value)} min="0.5" step="0.1"/></label><label>Pausa entre descargas (s)<input type="number" value={delay} onChange={event=>setDelay(event.target.value)} min="0"/></label><label>Reanudar desde video #<input type="number" value={start} onChange={event=>setStart(event.target.value)} min="1"/></label><label>Cookies del navegador<select value={cookieBrowser} onChange={event=>setCookieBrowser(event.target.value)}><option value="none">Sin cookies</option><option value="chrome">Chrome</option><option value="safari">Safari</option><option value="firefox">Firefox</option></select></label></div>
+    <button className="primary" disabled={!view?.projectId||running} onClick={async()=>{setRunning(true);setStatus('Preparando descarga…');try{await actions.runYoutube({json,clipDuration:Number(duration),delay:Number(delay),startIndex:Number(start),cookieBrowser},setStatus);}finally{setRunning(false);}}}>Descargar y segmentar</button><div className="studio-help" role="status">{status}</div>
+  </article>;
 }
