@@ -20,9 +20,9 @@ La interfaz se migrará por módulos. La composición de Remotion ya usa React y
 
 ## Fase 3: editor
 
-- Componentes para timeline, pistas, clips, inspector, controles globales y visor.
-- Migrar selección, undo/redo y drag/resize sin cambiar el formato de proyecto.
-- Renderizar solo el rango visible de la timeline y medir latencia con proyectos de cientos de escenas.
+- El inspector de cada toma ya es un componente React: material, encuadre, movimiento y carga de archivos usan callbacks. La biblioteca visual sigue usando el diálogo existente.
+- Las pistas, bloques, cortes y regla de la línea de tiempo se dibujan con componentes React. Conservan los atributos que utiliza el controlador actual para selección, arrastre y ajuste de duración. La búsqueda de nombres de assets ahora usa un índice por ID en cada render de la timeline.
+- Pendiente: migrar los demás paneles del inspector, los controles globales, el visor y los gestos de selección, undo/redo y drag/resize. Medir latencia con cientos de escenas y después renderizar solo el rango visible de la timeline.
 
 ## Fase 4: exportación y limpieza
 
