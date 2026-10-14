@@ -9,6 +9,7 @@ import {ProjectApp} from './project.jsx';
 import {AssetLibrary, ChapterGrouping, AutofillEntries, MissingMediaSummary, MediaBoard, MediaPagination} from './media.jsx';
 import {MediaPage} from './media-page.jsx';
 import {SceneInspector, TimelineRuler, TimelineLane, EffectInspector, TransitionInspector, SfxInspector, AudioInspector} from './editor.jsx';
+import {TextInspector,SubtitleInspector,MultiInspector} from './editor-text.jsx';
 
 const uiSlice=createSlice({
   name:'studioUi',
@@ -110,4 +111,5 @@ export function renderEditorInspector(view,actions){
   store.dispatch(uiSlice.actions.showEditorInspector(view));
   for(const [id,Component] of [['inspector-effect',EffectInspector],['inspector-transition',TransitionInspector],['inspector-sfx',SfxInspector]])if(!roots.has(id))root(id).render(<Provider store={store}><Component actions={actions}/></Provider>);
   for(const kind of ['voice','music'])if(!roots.has(`inspector-${kind}`))root(`inspector-${kind}`).render(<Provider store={store}><AudioInspector kind={kind} actions={actions}/></Provider>);
+  for(const [id,Component] of [['inspector-text',TextInspector],['inspector-subtitle',SubtitleInspector],['inspector-multi',MultiInspector]])if(!roots.has(id))root(id).render(<Provider store={store}><Component actions={actions}/></Provider>);
 }

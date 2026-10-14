@@ -23,7 +23,8 @@ La interfaz se migrará por módulos. La composición de Remotion ya usa React y
 - El inspector de cada toma ya es un componente React: material, encuadre, movimiento y carga de archivos usan callbacks. La biblioteca visual sigue usando el diálogo existente.
 - Las pistas, bloques, cortes y regla de la línea de tiempo se dibujan con componentes React. Conservan los atributos que utiliza el controlador actual para selección, arrastre y ajuste de duración. La búsqueda de nombres de assets ahora usa un índice por ID en cada render de la timeline.
 - Los paneles de efecto visual, transición, sonido, narración y música ya se dibujan en React y envían sus cambios mediante callbacks. Sus raíces se montan una vez y reciben las actualizaciones posteriores desde Redux.
-- Pendiente: migrar los paneles de texto, subtítulos y selección múltiple, los controles globales, el visor y los gestos de selección, undo/redo y drag/resize. Medir latencia con cientos de escenas y después renderizar solo el rango visible de la timeline.
+- Los paneles de texto, subtítulos y selección múltiple también usan React. Los campos de escritura mantienen un borrador local; las plantillas aplican únicamente sus propiedades de estilo y los colores tienen selectores y presets propios de los componentes.
+- Pendiente: migrar los controles globales, el visor y los gestos de selección, undo/redo y drag/resize. Medir latencia con cientos de escenas y después renderizar solo el rango visible de la timeline.
 
 ## Fase 4: exportación y limpieza
 

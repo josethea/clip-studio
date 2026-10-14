@@ -11,10 +11,7 @@ for(const [legacy,key] of Object.entries({activeMediaScene:'activeScene',mediaPr
 $('google-bridge-url').textContent=location.origin;
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const colorNames={yellow:'#ffe36c',cyan:'#73efff',pink:'#ff83bc',green:'#8ef7ae',white:'#ffffff'};
-const colorChoices=['#ffffff','#ffe36c','#ff83bc','#73efff','#42f578','#ff537e','#111111'];
 const hexColor=(value,fallback='#ffffff')=>/^#[\da-f]{6}$/i.test(value||'')?value.toLowerCase():colorNames[value]||fallback;
-function syncColorPresets(){document.querySelectorAll('[data-color-target]').forEach(group=>{const chosen=$(group.dataset.colorTarget)?.value?.toLowerCase();group.querySelectorAll('[data-preset-color]').forEach(button=>button.classList.toggle('active',button.dataset.presetColor===chosen));});}
-function syncCaptionControls(){const p=state.project;if(!p)return;const settings=p.settings||{};$('caption-style').value=settings.captionStyle||'cine';$('caption-font').value=settings.captionFont||'Inter';$('caption-size').value=settings.captionSize||'medium';$('caption-position').value=settings.captionPosition||'bottom';$('caption-color').value=hexColor(settings.captionColor,'#ffe36c');$('caption-accent').value=hexColor(settings.captionAccent,'#42f578');syncColorPresets();}
 const fmt=n=>{n=Number(n)||0;return `${String(Math.floor(n/60)).padStart(2,'0')}:${String(Math.floor(n%60)).padStart(2,'0')}.${String(Math.round(n%1*1000)).padStart(3,'0')}`;};
 const formatElapsed=ms=>{const seconds=Math.max(0,Math.round(Number(ms)/1000)||0);return `${String(Math.floor(seconds/3600)).padStart(2,'0')}:${String(Math.floor(seconds/60)%60).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`;};
 const exportReadyHtml=(project,result)=>`Video listo · Tiempo total de exportación: <strong>${formatElapsed(result.renderDurationMs)}</strong> · <a href="/api/studio/projects/${encodeURIComponent(project.id)}/files/${encodeURIComponent(result.name)}" download="${escape(project.title)}.mp4">Descargar MP4</a>`;
@@ -57,7 +54,7 @@ function renderProject(){const p=state.project;$('project-indicator').textConten
   if(p.rawSearchTerms&&p.cues?.length){try{const check=validateSearchTerms(p.rawSearchTerms,p.cues);sourceNotes.push(`${check.rows.length} search terms alineados con el SRT${check.warnings.length?` · ${check.warnings.length} textos difieren`:''}.`);}catch(error){sourceNotes.push(`Search terms: ${error.message}`);}}
   renderTranscriptPanel({id:p.id,sourceCues:p.sourceCues?.length||0,words:p.wordsJson?.words?.length||0,cues:p.cues?.length||0,chapters:p.rawChapters?sourceCount(p.rawChapters):0,searchTerms:p.rawSearchTerms?sourceCount(p.rawSearchTerms):0,sourceNote:sourceNotes.join(' ')},transcriptActions);
   renderAssets();
-  $('aspect-ratio').value=p.settings?.ratio||'9:16';$('quality').value=p.settings?.quality||'720p';$('export-quality').value=p.settings?.exportQuality||'high';$('captions-enabled').value=p.settings?.captions===false?'no':'yes';$('caption-style').querySelector('option[value="dynamic"]').disabled=!p.wordsJson?.words?.length;syncCaptionControls();$('caption-word-note').hidden=!!p.wordsJson?.words?.length;
+  $('aspect-ratio').value=p.settings?.ratio||'9:16';$('quality').value=p.settings?.quality||'720p';$('export-quality').value=p.settings?.exportQuality||'high';$('captions-enabled').value=p.settings?.captions===false?'no':'yes';
   if(state.pexelsTargetScene!=null&&!p.scenes[state.pexelsTargetScene])state.pexelsTargetScene=null;
   $('media-target-scene').innerHTML='<option value="">Solo guardar en biblioteca</option>'+p.scenes.map((scene,i)=>`<option value="${i}">Asset ${i+1} · bloques ${(scene.cueStart??i)+1}–${(scene.cueEnd??i)+1}</option>`).join('');$('media-target-scene').value=state.pexelsTargetScene==null?'':String(state.pexelsTargetScene);
   $('scene-mode').value=p.settings?.sceneMode||'srt';
@@ -152,22 +149,17 @@ function renderInspector(){
   $('inspector-heading').textContent=names[type]||'PROPIEDADES';$('inspector-time').textContent='';
   for(const kind of ['empty','multi','scene','effect','transition','text','subtitle','voice','music','sfx'])$('inspector-'+kind).hidden=kind!==(type||'empty');
   let panel=null;
-  if(type==='multi'){$('multi-summary').textContent=`${state.multiSelection.length} elementos seleccionados. Usa Mayús + clic para agregar o quitar bloques.`;$('multi-apply-effect').disabled=!state.multiSelection.some(x=>x.type==='scene');$('multi-hide-subtitles').disabled=!state.multiSelection.some(x=>x.type==='subtitle');$('multi-delete-text').disabled=!state.multiSelection.some(x=>x.type==='text');}
+  if(type==='multi')panel={type,count:state.multiSelection.length,hasScenes:state.multiSelection.some(x=>x.type==='scene'),hasSubtitles:state.multiSelection.some(x=>x.type==='subtitle'),hasText:state.multiSelection.some(x=>x.type==='text')};
   if(type==='scene'){const s=p.scenes[index];if(s)$('inspector-time').textContent=`${fmt(s.start)}–${fmt(s.end)}`;}
   if(type==='effect'){const raw=p.scenes[index];if(raw){const scene=effectiveScene(p,raw,index);panel={type,index,start:scene.start,end:scene.end,override:raw.effectOverride||null};$('inspector-time').textContent=`${fmt(scene.start)}–${fmt(scene.end)}`;}}
   if(type==='transition'){
     const s=p.scenes[index],next=p.scenes[index+1];if(s&&next){const resolved=effectiveScene(p,s,index);panel={type,index,cut:s.end,transition:resolved.transition,duration:resolved.transitionDuration};$('inspector-time').textContent=fmt(s.end);}
   }
   if(type==='text'){
-    const layer=p.textLayers[index];if(!layer)return;
-    $('text-type').value=layer.type||'highlight';renderTemplateOptions(layer.templateId);
-    for(const [id,key] of [['text-content','text'],['text-highlight','highlight'],['text-position','position'],['text-start','start'],['text-end','end'],['text-font','font'],['text-size','size'],['text-color','color'],['text-accent','accent'],['text-background','background'],['text-animation','animation']])$(id).value=key==='color'||key==='accent'?hexColor(layer[key],key==='color'?'#ffffff':'#ff537e'):layer[key]??'';
-    syncColorPresets();
-    $('inspector-time').textContent=`${fmt(layer.start)}–${fmt(layer.end)}`;
+    const layer=p.textLayers[index];if(layer){panel={type,index,layer:{...layer,color:hexColor(layer.color,'#ffffff'),accent:hexColor(layer.accent,'#ff537e')},templates:allTemplates().map(template=>({id:template.id,name:template.name}))};$('inspector-time').textContent=`${fmt(layer.start)}–${fmt(layer.end)}`;}
   }
   if(type==='subtitle'){
-    const c=(p.subtitleCues?.length?p.subtitleCues:p.cues)[index];if(!c)return;
-    $('subtitle-text').value=c.text;$('subtitle-start').value=c.start.toFixed(3);$('subtitle-end').value=c.end.toFixed(3);$('subtitle-hide').textContent=c.hidden?'Mostrar subtítulo':'Quitar este subtítulo';$('inspector-time').textContent=`${fmt(c.start)}–${fmt(c.end)}`;syncCaptionControls();
+    const c=(p.subtitleCues?.length?p.subtitleCues:p.cues)[index];if(c){panel={type,index,cue:{...c},settings:{captionStyle:p.settings?.captionStyle||'cine',captionFont:p.settings?.captionFont||'Inter',captionSize:p.settings?.captionSize||'medium',captionPosition:p.settings?.captionPosition||'bottom',captionColor:hexColor(p.settings?.captionColor,'#ffe36c'),captionAccent:hexColor(p.settings?.captionAccent,'#42f578')},hasWords:!!p.wordsJson?.words?.length};$('inspector-time').textContent=`${fmt(c.start)}–${fmt(c.end)}`;}
   }
   if(type==='sfx'){const s=p.scenes[index];if(s)panel={type,index,sfxId:s.sfxId||null,volume:s.sfxVolume??70,align:s.sfxAlign||'center',offset:s.sfxOffset||0,assets:p.assets.filter(asset=>asset.type==='audio').map(asset=>({id:asset.id,name:asset.name}))};}
   if(type==='voice'||type==='music')panel={type,narrationId:p.narrationId||null,musicId:p.musicId||null,musicVolume:p.settings?.musicVolume??20,assets:p.assets.filter(asset=>asset.type==='audio').map(asset=>({id:asset.id,name:asset.name}))};
@@ -321,7 +313,18 @@ const inspectorActions={
   audioSelect(key,value){if(!state.project||!['narrationId','musicId'].includes(key))return;rememberEdit();state.project[key]=value||null;renderScenes();updatePreview(true);markEditorDirty();},
   musicVolume(value){if(!state.project||!Number.isFinite(value)||value<0||value>100)return;rememberEdit();state.project.settings.musicVolume=value;renderScenes();updatePreview(true);markEditorDirty();},
   audioUpload(id,files){return withError(async()=>receiveInput(id,files))();},
-  audioDrop(id,dataTransfer){return withError(async()=>receiveInput(id,await droppedFiles(dataTransfer)))();}
+  audioDrop(id,dataTransfer){return withError(async()=>receiveInput(id,await droppedFiles(dataTransfer)))();},
+  textField(index,key,value){return updateTextField(index,key,value);},
+  textTemplate(index,id){if(state.selection?.type==='text'&&state.selection.index===index)applyTextTemplate(id);},
+  saveTextTemplate(index){if(state.selection?.type==='text'&&state.selection.index===index)return withError(saveSelectedTemplate)();},
+  deleteText(index){const p=state.project;if(!p||state.selection?.type!=='text'||state.selection.index!==index)return;rememberEdit();p.textLayers.splice(index,1);state.selection=null;renderScenes();updatePreview(true);markEditorDirty();},
+  subtitleField(index,key,value){return updateSubtitleField(index,key,value);},
+  toggleSubtitle(index){const p=state.project,cue=p?.subtitleCues?.[index];if(!cue||state.selection?.type!=='subtitle'||state.selection.index!==index)return;rememberEdit();cue.hidden=!cue.hidden;renderScenes();updatePreview(true);markEditorDirty();},
+  captionSetting(key,value){const p=state.project;if(!p||!['captionStyle','captionFont','captionSize','captionPosition','captionColor','captionAccent'].includes(key))return;if(key==='captionStyle'&&value==='dynamic'&&!p.wordsJson?.words?.length)return;if(p.settings[key]===value)return;rememberEdit();p.settings[key]=value;renderInspector();updatePreview(true);markEditorDirty();},
+  multiEffect(value){const p=state.project,items=state.multiSelection.filter(x=>x.type==='scene'&&p?.scenes[x.index]);if(!items.length||value!=='global'&&!videoEffects.includes(value))return;rememberEdit();for(const item of items)p.scenes[item.index].effectOverride=value==='global'?null:value;renderScenes();updatePreview(true);markEditorDirty();},
+  multiHideSubtitles(){const p=state.project,items=state.multiSelection.filter(x=>x.type==='subtitle'&&p?.subtitleCues?.[x.index]);if(!items.length)return;rememberEdit();for(const item of items)p.subtitleCues[item.index].hidden=true;renderScenes();updatePreview(true);markEditorDirty();},
+  multiDeleteText(){const p=state.project,indices=state.multiSelection.filter(x=>x.type==='text'&&p?.textLayers?.[x.index]).map(x=>x.index).sort((a,b)=>b-a);if(!indices.length)return;rememberEdit();for(const index of indices)p.textLayers.splice(index,1);state.multiSelection=[];state.selection=null;renderScenes();updatePreview(true);markEditorDirty();},
+  multiClear(){state.multiSelection=[];state.selection=null;state.selectedScene=null;renderScenes();}
 };
 const mediaActions={
   assignAsset(assetId){return withError(async()=>{const p=requireProject(),value=$('media-target-scene').value;if(value==='')throw Error('Selecciona una escena de destino');const index=Number(value);if(!p.scenes[index])throw Error('Escena de destino no disponible');p.scenes[index].assetId=assetId;await saveProject();notice(`Medio asignado al bloque ${index+1}`);})();},
@@ -421,7 +424,7 @@ $('preview-play').onclick=withError(async()=>{requireProject();await setPreviewP
 $('preview-stop').onclick=withError(async()=>{requireProject();await setPreviewPlaying(false);seekExact(0);});
 $('preview-from-start').onclick=withError(async()=>{requireProject();await setPreviewPlaying(false);seekExact(0);await setPreviewPlaying(true);});
 $('preview-seek').oninput=e=>seekExact(e.target.value);$('timeline-zoom').oninput=e=>{state.timelineScale=Number(e.target.value);renderTimeline();};
-for(const [id,key,transform] of [['aspect-ratio','ratio',String],['quality','quality',String],['captions-enabled','captions',x=>x==='yes'],['caption-style','captionStyle',String]])$(id).onchange=e=>{if(state.project){rememberEdit();state.project.settings[key]=transform(e.target.value);renderScenes();updatePreview(true);markEditorDirty();}};
+for(const [id,key,transform] of [['aspect-ratio','ratio',String],['quality','quality',String],['captions-enabled','captions',x=>x==='yes']])$(id).onchange=e=>{if(state.project){rememberEdit();state.project.settings[key]=transform(e.target.value);renderScenes();updatePreview(true);markEditorDirty();}};
 $('export-quality').onchange=e=>{if(!state.project)return;rememberEdit();state.project.settings.exportQuality=e.target.value;renderExport();markEditorDirty();};
 $('save-editor').onclick=withError(async()=>{await saveProject();notice('Edición guardada');});
 $('preview-render').onclick=withError(async()=>{requireProject();state.previewSnapshot=null;updatePreview(true);notice('Composición actualizada');});
@@ -449,7 +452,6 @@ const customTemplates=()=>{try{return JSON.parse(localStorage.getItem('clip-stud
 const allTemplates=()=>[...builtInTemplates,...customTemplates()];
 async function loadTemplates(){try{const items=await api('/templates');localStorage.setItem('clip-studio-text-templates',JSON.stringify(items));renderTemplateLibrary();}catch{renderTemplateLibrary();}}
 async function persistTemplates(items){await api('/templates',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(items)});localStorage.setItem('clip-studio-text-templates',JSON.stringify(items));renderTemplateLibrary();}
-function renderTemplateOptions(selected){$('text-template').innerHTML=allTemplates().map(t=>`<option value="${escape(t.id)}">${escape(t.name)}</option>`).join('');$('text-template').value=selected||'headline';}
 function renderTemplateLibrary(){const box=$('template-library');if(!box)return;box.innerHTML=allTemplates().map(t=>`<div class="template-entry"><button type="button" class="template-card" data-template-create="${escape(t.id)}"><strong>${escape(t.name)}</strong><small>${t.id.startsWith('custom-')?'Personalizada':'Incluida'}</small></button>${t.id.startsWith('custom-')?`<button class="template-remove" data-template-delete="${escape(t.id)}" title="Eliminar plantilla">×</button>`:''}</div>`).join('');}
 function editableSnapshot(p){return JSON.stringify({scenes:p.scenes,textLayers:p.textLayers,subtitleCues:p.subtitleCues,settings:p.settings,narrationId:p.narrationId,musicId:p.musicId});}
 function restoreEditable(snapshot){const data=JSON.parse(snapshot),p=requireProject();Object.assign(p,data);if(state.selection?.type==='text'&&!p.textLayers[state.selection.index])state.selection=null;if(state.selection?.type==='scene'&&!p.scenes[state.selection.index])state.selection=null;state.selectedScene=state.selection?.type==='scene'?state.selection.index:null;renderProject();}
@@ -481,14 +483,14 @@ async function saveSelectedTemplate(){
   const t={id:`custom-${crypto.randomUUID()}`,name,type:layer.type,position:layer.position,font:layer.font,size:layer.size,color:layer.color,accent:layer.accent,background:layer.background,animation:layer.animation};const items=customTemplates();items.push(t);await persistTemplates(items);layer.templateId=t.id;renderInspector();notice(`Plantilla «${name}» guardada para todos tus proyectos`);
 }
 function applyTextTemplate(id){const layer=state.project?.textLayers?.[state.selection?.type==='text'?state.selection.index:-1],t=allTemplates().find(x=>x.id===id);if(!layer||!t)return;rememberEdit();for(const key of ['type','font','size','color','accent','background','animation'])layer[key]=t[key];layer.templateId=id;renderInspector();updatePreview(true);markEditorDirty();}
-function updateTextField(id,key){const layer=state.project?.textLayers?.[state.selection?.type==='text'?state.selection.index:-1];if(!layer)return;const raw=$(id).value,value=['start','end','size','background'].includes(key)?Number(raw):raw;
-  if(key==='start'&&!(value>=0&&value<layer.end-.03))return;if(key==='end'&&!(value>layer.start+.03&&value<=state.project.scenes.at(-1).end))return;
-  rememberEdit();layer[key]=value;renderTimeline();syncColorPresets();updatePreview(true);markEditorDirty();
+function updateTextField(index,key,raw){const layer=state.project?.textLayers?.[index];if(!layer||state.selection?.type!=='text'||state.selection.index!==index)return false;const value=['start','end','size','background'].includes(key)?Number(raw):raw;
+  if(key==='start'&&!(value>=0&&value<layer.end-.03))return false;if(key==='end'&&!(value>layer.start+.03&&value<=state.project.scenes.at(-1).end))return false;
+  rememberEdit();layer[key]=value;renderTimeline();if(key==='start'||key==='end')renderInspector();updatePreview(true);markEditorDirty();return true;
 }
-function updateSubtitleField(id,key){const p=requireProject(),cue=(p.subtitleCues?.length?p.subtitleCues:p.cues)[state.selection?.type==='subtitle'?state.selection.index:-1];if(!cue)return;
-  const value=key==='text'?$(id).value:Number($(id).value),end=p.scenes.at(-1)?.end||0;
-  if(key==='start'&&!(value>=0&&value<cue.end-.03))return;if(key==='end'&&!(value>cue.start+.03&&value<=end))return;
-  rememberEdit();cue[key]=value;renderTimeline();updatePreview(true);markEditorDirty();
+function updateSubtitleField(index,key,raw){const p=requireProject(),cue=(p.subtitleCues?.length?p.subtitleCues:p.cues)[index];if(!cue||state.selection?.type!=='subtitle'||state.selection.index!==index)return false;
+  const value=key==='text'?raw:Number(raw),end=p.scenes.at(-1)?.end||0;
+  if(key==='start'&&!(value>=0&&value<cue.end-.03))return false;if(key==='end'&&!(value>cue.start+.03&&value<=end))return false;
+  rememberEdit();cue[key]=value;renderTimeline();if(key==='start'||key==='end')renderInspector();updatePreview(true);markEditorDirty();return true;
 }
 
 // Editor contextual: cada pista selecciona sus propias propiedades.
@@ -499,22 +501,7 @@ window.addEventListener('keydown',e=>{if(!document.getElementById('editor').clas
 $('add-text').onclick=$('add-text-empty').onclick=uiAction(()=>addText());
 $('template-new').onclick=uiAction(()=>addText());
 $('template-library').onclick=uiAction(async e=>{const remove=e.target.closest('[data-template-delete]');if(remove){const items=customTemplates().filter(t=>t.id!==remove.dataset.templateDelete);await persistTemplates(items);return;}const card=e.target.closest('[data-template-create]');if(card)addText(card.dataset.templateCreate);});
-$('template-save').onclick=$('text-save-template').onclick=uiAction(saveSelectedTemplate);
-$('text-template').onchange=e=>applyTextTemplate(e.target.value);
-$('text-type').onchange=e=>updateTextField('text-type','type');
-for(const [id,key] of [['text-content','text'],['text-highlight','highlight'],['text-position','position'],['text-start','start'],['text-end','end'],['text-font','font'],['text-size','size'],['text-color','color'],['text-accent','accent'],['text-background','background'],['text-animation','animation']])$(id).addEventListener('input',()=>updateTextField(id,key));
-$('text-delete').onclick=uiAction(()=>{const p=requireProject(),i=state.selection?.type==='text'?state.selection.index:-1;if(i<0)return;rememberEdit();p.textLayers.splice(i,1);state.selection=null;renderScenes();updatePreview(true);markEditorDirty();});
-$('multi-apply-effect').onclick=uiAction(()=>{const p=requireProject(),items=state.multiSelection.filter(x=>x.type==='scene'&&p.scenes[x.index]);if(!items.length)return;rememberEdit();const value=$('multi-effect').value;for(const item of items)p.scenes[item.index].effectOverride=value==='global'?null:value;renderScenes();updatePreview(true);markEditorDirty();});
-$('multi-hide-subtitles').onclick=uiAction(()=>{const p=requireProject(),items=state.multiSelection.filter(x=>x.type==='subtitle'&&p.subtitleCues?.[x.index]);if(!items.length)return;rememberEdit();for(const item of items)p.subtitleCues[item.index].hidden=true;renderScenes();updatePreview(true);markEditorDirty();});
-$('multi-delete-text').onclick=uiAction(()=>{const p=requireProject(),indices=state.multiSelection.filter(x=>x.type==='text'&&p.textLayers?.[x.index]).map(x=>x.index).sort((a,b)=>b-a);if(!indices.length)return;rememberEdit();for(const index of indices)p.textLayers.splice(index,1);state.multiSelection=[];state.selection=null;renderScenes();updatePreview(true);markEditorDirty();});
-$('multi-clear').onclick=()=>{state.multiSelection=[];state.selection=null;state.selectedScene=null;renderScenes();};
-for(const [id,key] of [['subtitle-text','text'],['subtitle-start','start'],['subtitle-end','end']])$(id).addEventListener('input',()=>updateSubtitleField(id,key));
-$('subtitle-hide').onclick=uiAction(()=>{const p=requireProject(),cue=p.subtitleCues?.[state.selection?.index];if(!cue)return;rememberEdit();cue.hidden=!cue.hidden;renderScenes();updatePreview(true);markEditorDirty();});
-for(const [id,key] of [['caption-font','captionFont'],['caption-size','captionSize'],['caption-position','captionPosition']])$(id).onchange=e=>{const p=state.project;if(!p)return;rememberEdit();p.settings[key]=e.target.value;updatePreview(true);markEditorDirty();};
-for(const [id,key] of [['caption-color','captionColor'],['caption-accent','captionAccent']])$(id).addEventListener('input',e=>{const p=state.project;if(!p||p.settings[key]===e.target.value)return;rememberEdit();p.settings[key]=e.target.value;syncColorPresets();updatePreview(true);markEditorDirty();});
-document.querySelectorAll('[data-color-target]').forEach(group=>{group.innerHTML=colorChoices.map(color=>`<button type="button" class="color-preset" data-preset-color="${color}" style="--swatch:${color}" title="${color}" aria-label="Elegir color ${color}"></button>`).join('');});
-document.addEventListener('click',e=>{const swatch=e.target.closest('[data-preset-color]');if(!swatch)return;const input=$(swatch.parentElement.dataset.colorTarget);if(!input||input.value.toLowerCase()===swatch.dataset.presetColor)return;input.value=swatch.dataset.presetColor;input.dispatchEvent(new Event('input',{bubbles:true}));});
-syncColorPresets();
+$('template-save').onclick=uiAction(saveSelectedTemplate);
 updateUndoButtons();
 loadTemplates();
 
