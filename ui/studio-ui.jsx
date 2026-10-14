@@ -11,6 +11,7 @@ import {TimelineView,HistoryControls} from './editor.jsx';
 import {TemplatePanel,EditorMediaPicker} from './editor-extras.jsx';
 import {NarrationControls,EditorStoryboardControls,MediaStoryboardControls,TimelineToolbar,MonitorActions} from './editor-workflow.jsx';
 import {EditorInspectorPanel} from './editor-inspector-panel.jsx';
+import {emptyEditorInteraction,selectEditorItem as deriveEditorSelection,restoreEditorInteraction as reconcileEditorSelection} from './editor-selection-model.mjs';
 import {GlobalControls,FormatControls,PreviewControls} from './editor-controls.jsx';
 import {ExportPage} from './export.jsx';
 import {RenamePanel} from './rename.jsx';
@@ -18,7 +19,7 @@ import {GeminiPanel,KeysPanel,PromptsPanel} from './sidebar-tools.jsx';
 
 const uiSlice=createSlice({
   name:'studioUi',
-  initialState:{globalControls:null,formatControls:null,previewControls:null,editorHistory:{canUndo:false,canRedo:false},exportView:{projectId:null,title:'',problems:['Crea o abre un proyecto'],summary:'',resolutionNote:'',exports:[],ready:null},exportProgress:{mp4:'',running:false,capcut:'',capcutRunning:false,capcutResult:null},renameView:{count:0,duplicates:0,message:''},transcript:null,project:null,projects:[],mediaAssets:null,mediaTarget:{selected:null,scenes:[]},mediaChapters:null,mediaAutofill:{projectId:null,sceneCount:0,entries:[],start:1,running:false,remaining:0,missingOnly:false,requirements:'',canRun:false},autofillProgress:{visible:false,percent:0,status:''},youtubeSources:{projectId:null,json:''},mediaMissing:null,mediaBoard:null,mediaStock:null,mediaPagination:{assets:null,media:null},mediaSession:{activeScene:0,assetTargetScene:null,provider:'storyblocks',type:'videos',query:'',searched:false,missingOnly:false,pexelsPage:0,storyblocksPage:0,googlePage:0},editorScene:null,editorSceneExtras:null,editorTemplates:[],editorMediaPicker:null,editorNarration:null,editorStoryboard:null,editorTimeline:null,editorInspector:null,editorSelection:null},
+  initialState:{globalControls:null,formatControls:null,previewControls:null,editorHistory:{canUndo:false,canRedo:false},exportView:{projectId:null,title:'',problems:['Crea o abre un proyecto'],summary:'',resolutionNote:'',exports:[],ready:null},exportProgress:{mp4:'',running:false,capcut:'',capcutRunning:false,capcutResult:null},renameView:{count:0,duplicates:0,message:''},transcript:null,project:null,projects:[],mediaAssets:null,mediaTarget:{selected:null,scenes:[]},mediaChapters:null,mediaAutofill:{projectId:null,sceneCount:0,entries:[],start:1,running:false,remaining:0,missingOnly:false,requirements:'',canRun:false},autofillProgress:{visible:false,percent:0,status:''},youtubeSources:{projectId:null,json:''},mediaMissing:null,mediaBoard:null,mediaStock:null,mediaPagination:{assets:null,media:null},mediaSession:{activeScene:0,assetTargetScene:null,provider:'storyblocks',type:'videos',query:'',searched:false,missingOnly:false,pexelsPage:0,storyblocksPage:0,googlePage:0},editorScene:null,editorSceneExtras:null,editorTemplates:[],editorMediaPicker:null,editorNarration:null,editorStoryboard:null,editorTimeline:null,editorInspector:null,editorSelection:null,editorInteraction:emptyEditorInteraction()},
   reducers:{
     showGlobalControls(state,action){state.globalControls=action.payload;},
     showFormatControls(state,action){state.formatControls=action.payload;},
@@ -40,6 +41,9 @@ const uiSlice=createSlice({
     showMediaStock(state,action){state.mediaStock=action.payload;},
     showMediaPagination(state,action){state.mediaPagination[action.payload.kind]=action.payload.view;},
     patchMediaSession(state,action){Object.assign(state.mediaSession,action.payload);},
+    patchEditorInteraction(state,action){Object.assign(state.editorInteraction,action.payload);},
+    selectEditorItem(state,action){state.editorInteraction=deriveEditorSelection(state.editorInteraction,action.payload.type,action.payload.index,action.payload.append);},
+    restoreEditorInteraction(state,action){state.editorInteraction=reconcileEditorSelection(action.payload,state.editorInteraction);},
     showEditorScene(state,action){state.editorScene=action.payload;},
     showEditorSceneExtras(state,action){state.editorSceneExtras=action.payload;},
     showEditorTemplates(state,action){state.editorTemplates=action.payload;},
@@ -128,6 +132,10 @@ export function renderStockCards(view){store.dispatch(uiSlice.actions.showMediaS
 export function mountMediaPage(){flushSync(()=>root('assets').render(<MediaPage/>));}
 export function getMediaSession(){return store.getState().studioUi.mediaSession;}
 export function patchMediaSession(patch){store.dispatch(uiSlice.actions.patchMediaSession(patch));}
+export function getEditorInteraction(){return store.getState().studioUi.editorInteraction;}
+export function patchEditorInteraction(patch){store.dispatch(uiSlice.actions.patchEditorInteraction(patch));}
+export function selectEditorInteraction(type,index,append=false){store.dispatch(uiSlice.actions.selectEditorItem({type,index,append}));}
+export function restoreEditorSelection(sceneCount,textCount){store.dispatch(uiSlice.actions.restoreEditorInteraction({sceneCount,textCount}));}
 export function renderSceneInspector(view){store.dispatch(uiSlice.actions.showEditorScene(view));}
 export function renderSceneExtras(view){store.dispatch(uiSlice.actions.showEditorSceneExtras(view));}
 export function renderTemplatePanel(view,actions){renderMediaIsland('template-panel',uiSlice.actions.showEditorTemplates,view,TemplatePanel,actions);}

@@ -41,6 +41,7 @@ La interfaz se migrará por módulos. La composición de Remotion ya usa React y
 - El modelo de pistas, marcas, selección y transiciones salió del controlador a `timeline-model.mjs`, con pruebas para cortes y transiciones centradas. Los botones del visor y el mensaje de inspector vacío también son componentes React.
 - El inspector completo se monta ahora en una sola raíz React: título, tiempo y panel seleccionado cambian juntos mediante Redux. Se eliminaron los diez contenedores HTML y las órdenes DOM que los mostraban u ocultaban. Sus controles siguen usando los mismos callbacks de edición.
 - El modelo del inspector salió de `public/studio.js` a `editor-inspector-model.mjs`: calcula propiedades, títulos y tiempos de cada selección sin depender del DOM. La creación de textos, aplicación de plantillas y validación de cambios de texto y subtítulos se calculan en `editor-text-model.mjs`; el controlador conserva el historial, guardado y actualización de la vista. Los textos nuevos reciben un ID único distinto del ID de su plantilla.
+- La selección simple y múltiple del timeline, junto con la toma enfocada, reside en Redux. `editor-selection-model.mjs` calcula la selección y la reconcilia tras deshacer o rehacer; el controlador ya no conserva una segunda copia de esos datos.
 - Pendiente: trasladar el resto del estado editable y las acciones de guardado del controlador a módulos de dominio. El modelo de pistas aún se calcula completo antes de filtrar el render de React.
 
 ## Fase 4: exportación y limpieza
