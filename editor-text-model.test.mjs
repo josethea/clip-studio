@@ -1,0 +1,30 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createTextLayer,templateStylePatch,textFieldValue,subtitleFieldValue} from './editor-text-model.mjs';
+
+test('text plans preserve placement while changing only requested style and timing',()=>{
+  const project={scenes:[{start:0,end:8}],textLayers:[{start:1,end:4,position:'top-left',font:'Inter',text:'Ejemplo'}],subtitleCues:[{start:2,end:5,text:'Hola'}]};
+  const template={id:'anton',type:'title',position:'bottom',font:'Anton',size:7,color:'#ffffff',accent:'#ff537e',background:0,animation:'pop'};
+  const layer=createTextLayer(project,template,7.9,'new-id');
+  assert.equal(layer.id,'new-id');
+  assert.equal(layer.templateId,'anton');
+  assert.equal(layer.start,7.7);
+  assert.equal(layer.end,8);
+  assert.equal(layer.position,'bottom');
+  assert.throws(()=>createTextLayer({...project,scenes:[]},template,0,'id'),/Crea primero el storyboard/);
+  const patch=templateStylePatch(template);
+  assert.equal(patch.font,'Anton');
+  assert.equal('position' in patch,false);
+  assert.equal('start' in patch,false);
+  assert.equal('text' in patch,false);
+  assert.deepEqual(textFieldValue(project,0,'font','Anton'),{value:'Anton'});
+  assert.deepEqual(textFieldValue(project,0,'start','0.5'),{value:0.5});
+  assert.equal(textFieldValue(project,0,'start','4'),null);
+  assert.equal(textFieldValue(project,0,'end','9'),null);
+  assert.deepEqual(subtitleFieldValue(project,0,'text','Nuevo texto'),{value:'Nuevo texto'});
+  assert.deepEqual(subtitleFieldValue(project,0,'end','6'),{value:6});
+  assert.equal(subtitleFieldValue(project,0,'end','9'),null);
+  assert.equal(subtitleFieldValue(project,0,'start','5'),null);
+  assert.equal(project.textLayers[0].font,'Inter');
+  assert.equal(project.subtitleCues[0].text,'Hola');
+});

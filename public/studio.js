@@ -1,4 +1,4 @@
-import {parseSrt,serializeSrt,mergeSrt,wordsToSrt,normalizeWordsPayload,renamedAsset,resolveChapters,validateSearchTerms,makeScenes,transitions,migrateProjectTransitions,videoEffects,effectiveScene} from '/studio-core.mjs';
+import {parseSrt,serializeSrt,mergeSrt,wordsToSrt,normalizeWordsPayload,renamedAsset,resolveChapters,validateSearchTerms,makeScenes,transitions,migrateProjectTransitions,videoEffects} from '/studio-core.mjs';
 import {prepareRemotionProject} from '/remotion-data.mjs';
 import {createEditorSession} from '/editor-session.mjs';
 import {exportView} from '/export-view.mjs';
@@ -6,6 +6,8 @@ import {getCredential,subscribeCredentials} from '/credential-session.mjs';
 import {createMediaService} from '/media-service.mjs';
 import {createStockSearch} from '/media-search.mjs';
 import {buildTimelineView} from '/timeline-model.mjs';
+import {buildInspectorView} from '/editor-inspector-model.mjs';
+import {createTextLayer,templateStylePatch,textFieldValue,subtitleFieldValue} from '/editor-text-model.mjs';
 import '/remotion-player.js';
 import {renderGlobalSettings,renderFormatSettings,renderPreviewTransport,renderExportPage,patchExportProgress,renderRenamePanel,mountSidebarTools,renderTranscriptPanel,renderProjectPanel,renderProjectOptions,renderAssetLibrary,renderAssetTarget,renderChapterGroups,renderAutofillPanel,patchAutofillProgress,renderYoutubeSources,renderMissingSummary,renderStoryboard,renderStockCards,renderMediaPagination,renderSceneInspector,renderSceneExtras,renderTemplatePanel,renderEditorMediaPicker,renderNarrationPanel,renderStoryboardSettings,mountEditorButtons,mountEditorInspector,renderEditorTimeline,renderEditorHistory,renderEditorInspector,renderInspectorSelection,mountMediaPage,getMediaSession,patchMediaSession} from '/studio-ui.js';
 mountMediaPage();
@@ -13,8 +15,6 @@ const $=id=>document.getElementById(id), state={project:null,rename:null,youtube
 // Media interaction state (scene, provider, query, pages) lives in the Redux media session.
 const media=getMediaSession,setMedia=patchMediaSession;
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const colorNames={yellow:'#ffe36c',cyan:'#73efff',pink:'#ff83bc',green:'#8ef7ae',white:'#ffffff'};
-const hexColor=(value,fallback='#ffffff')=>/^#[\da-f]{6}$/i.test(value||'')?value.toLowerCase():colorNames[value]||fallback;
 const fmt=n=>{n=Number(n)||0;return `${String(Math.floor(n/60)).padStart(2,'0')}:${String(Math.floor(n%60)).padStart(2,'0')}.${String(Math.round(n%1*1000)).padStart(3,'0')}`;};
 const notice=(message,bad=false)=>{$('global-message').textContent=message;$('global-message').style.color=bad?'#ff8dab':'#78d7aa';};
 async function api(path,options={}){const response=await fetch(`/api/studio${path}`,options),data=await response.json().catch(()=>({}));if(!response.ok)throw Error(data.error||`Error ${response.status}`);return data;}
@@ -125,26 +125,10 @@ function renderScenePage(){
   renderSceneExtras({index:i,scene:s?{...s}:null,assets:p.assets.filter(a=>a.type==='image').map(a=>({id:a.id,name:a.name})),overrideMode:state.segmentOverrideMode},sceneExtraActions);
 }
 function renderInspector(){
-  const p=state.project;if(!p)return;const selected=state.selection,type=selected?.type,index=selected?.index;
-  const names={scene:'TOMA',effect:'EFECTO VISUAL',transition:'TRANSICIÓN',text:'TEXTO EN PANTALLA',subtitle:'SUBTÍTULO',voice:'NARRACIÓN',music:'MÚSICA',sfx:'EFECTO DE SONIDO',multi:'SELECCIÓN MÚLTIPLE'};
-  let inspectorTime='';
-  let panel=null;
-  if(type==='multi')panel={type,count:state.multiSelection.length,hasScenes:state.multiSelection.some(x=>x.type==='scene'),hasSubtitles:state.multiSelection.some(x=>x.type==='subtitle'),hasText:state.multiSelection.some(x=>x.type==='text')};
-  if(type==='scene'){const s=p.scenes[index];if(s)inspectorTime=`${fmt(s.start)}–${fmt(s.end)}`;}
-  if(type==='effect'){const raw=p.scenes[index];if(raw){const scene=effectiveScene(p,raw,index);panel={type,index,start:scene.start,end:scene.end,override:raw.effectOverride||null};inspectorTime=`${fmt(scene.start)}–${fmt(scene.end)}`;}}
-  if(type==='transition'){
-    const s=p.scenes[index],next=p.scenes[index+1];if(s&&next){const resolved=effectiveScene(p,s,index);panel={type,index,cut:s.end,transition:resolved.transition,duration:resolved.transitionDuration};inspectorTime=fmt(s.end);}
-  }
-  if(type==='text'){
-    const layer=p.textLayers[index];if(layer){panel={type,index,layer:{...layer,color:hexColor(layer.color,'#ffffff'),accent:hexColor(layer.accent,'#ff537e')},templates:allTemplates().map(template=>({id:template.id,name:template.name}))};inspectorTime=`${fmt(layer.start)}–${fmt(layer.end)}`;}
-  }
-  if(type==='subtitle'){
-    const c=(p.subtitleCues?.length?p.subtitleCues:p.cues)[index];if(c){panel={type,index,cue:{...c},settings:{captionStyle:p.settings?.captionStyle||'cine',captionFont:p.settings?.captionFont||'Inter',captionSize:p.settings?.captionSize||'medium',captionPosition:p.settings?.captionPosition||'bottom',captionColor:hexColor(p.settings?.captionColor,'#ffe36c'),captionAccent:hexColor(p.settings?.captionAccent,'#42f578')},hasWords:!!p.wordsJson?.words?.length};inspectorTime=`${fmt(c.start)}–${fmt(c.end)}`;}
-  }
-  if(type==='sfx'){const s=p.scenes[index];if(s)panel={type,index,sfxId:s.sfxId||null,volume:s.sfxVolume??70,align:s.sfxAlign||'center',offset:s.sfxOffset||0,assets:p.assets.filter(asset=>asset.type==='audio').map(asset=>({id:asset.id,name:asset.name}))};}
-  if(type==='voice'||type==='music')panel={type,narrationId:p.narrationId||null,musicId:p.musicId||null,musicVolume:p.settings?.musicVolume??20,assets:p.assets.filter(asset=>asset.type==='audio').map(asset=>({id:asset.id,name:asset.name}))};
-  renderEditorInspector(panel);
-  renderInspectorSelection({type:type||'empty',heading:names[type]||'PROPIEDADES',time:inspectorTime});
+  if(!state.project)return;
+  const view=buildInspectorView(state.project,{selection:state.selection,multiSelection:state.multiSelection,templates:state.selection?.type==='text'?allTemplates():[]});
+  renderEditorInspector(view.panel);
+  renderInspectorSelection(view.selection);
 }
 function renderExport(){renderExportPage(exportView(state.project),exportActions);}
 const renderSnapshot=p=>JSON.stringify({scenes:p.scenes,assets:p.assets,cues:p.cues,subtitleCues:p.subtitleCues,textLayers:p.textLayers,words:p.wordsJson?.words,narrationId:p.narrationId,musicId:p.musicId,settings:p.settings});
@@ -475,24 +459,23 @@ function selectTimeline(type,index,append=false){
   renderScenes();
 }
 function addText(templateId='headline'){
-  const p=requireProject(),template=allTemplates().find(t=>t.id===templateId)||builtInTemplates[0],end=p.scenes.at(-1)?.end||0;
-  if(!end)throw Error('Crea primero el storyboard');rememberEdit();const start=Math.min(state.previewTime,Math.max(0,end-.3)),duration=Math.min(3,end-start);
-  const layer={id:crypto.randomUUID(),...template,templateId:template.id,text:'Nuevo texto',highlight:'',start,end:start+duration};p.textLayers??=[];p.textLayers.push(layer);selectTimeline('text',p.textLayers.length-1);updatePreview(true);markEditorDirty();
+  const p=requireProject(),template=allTemplates().find(t=>t.id===templateId)||builtInTemplates[0];
+  const layer=createTextLayer(p,template,state.previewTime,crypto.randomUUID());
+  rememberEdit();p.textLayers??=[];p.textLayers.push(layer);selectTimeline('text',p.textLayers.length-1);updatePreview(true);markEditorDirty();
 }
 async function saveSelectedTemplate(){
   const layer=state.project?.textLayers?.[state.selection?.type==='text'?state.selection.index:-1];if(!layer)throw Error('Selecciona un texto en el timeline');
   const name=window.prompt('Nombre de la nueva plantilla',`Mi ${allTemplates().find(t=>t.id===layer.templateId)?.name||'plantilla'}`)?.trim();if(!name)return;
   const t={id:`custom-${crypto.randomUUID()}`,name,type:layer.type,position:layer.position,font:layer.font,size:layer.size,color:layer.color,accent:layer.accent,background:layer.background,animation:layer.animation};const items=customTemplates();items.push(t);await persistTemplates(items);layer.templateId=t.id;renderInspector();notice(`Plantilla «${name}» guardada para todos tus proyectos`);
 }
-function applyTextTemplate(id){const layer=state.project?.textLayers?.[state.selection?.type==='text'?state.selection.index:-1],t=allTemplates().find(x=>x.id===id);if(!layer||!t)return;rememberEdit();for(const key of ['type','font','size','color','accent','background','animation'])layer[key]=t[key];layer.templateId=id;renderInspector();updatePreview(true);markEditorDirty();}
-function updateTextField(index,key,raw){const layer=state.project?.textLayers?.[index];if(!layer||state.selection?.type!=='text'||state.selection.index!==index)return false;const value=['start','end','size','background'].includes(key)?Number(raw):raw;
-  if(key==='start'&&!(value>=0&&value<layer.end-.03))return false;if(key==='end'&&!(value>layer.start+.03&&value<=state.project.scenes.at(-1).end))return false;
-  rememberEdit();layer[key]=value;renderTimeline();if(key==='start'||key==='end')renderInspector();updatePreview(true);markEditorDirty();return true;
+function applyTextTemplate(id){const layer=state.project?.textLayers?.[state.selection?.type==='text'?state.selection.index:-1],template=allTemplates().find(item=>item.id===id);if(!layer||!template)return;rememberEdit();Object.assign(layer,templateStylePatch(template));renderInspector();updatePreview(true);markEditorDirty();}
+function updateTextField(index,key,raw){const layer=state.project?.textLayers?.[index];if(!layer||state.selection?.type!=='text'||state.selection.index!==index)return false;
+  const change=textFieldValue(state.project,index,key,raw);if(!change)return false;
+  rememberEdit();layer[key]=change.value;renderTimeline();if(key==='start'||key==='end')renderInspector();updatePreview(true);markEditorDirty();return true;
 }
 function updateSubtitleField(index,key,raw){const p=requireProject(),cue=(p.subtitleCues?.length?p.subtitleCues:p.cues)[index];if(!cue||state.selection?.type!=='subtitle'||state.selection.index!==index)return false;
-  const value=key==='text'?raw:Number(raw),end=p.scenes.at(-1)?.end||0;
-  if(key==='start'&&!(value>=0&&value<cue.end-.03))return false;if(key==='end'&&!(value>cue.start+.03&&value<=end))return false;
-  rememberEdit();cue[key]=value;renderTimeline();if(key==='start'||key==='end')renderInspector();updatePreview(true);markEditorDirty();return true;
+  const change=subtitleFieldValue(p,index,key,raw);if(!change)return false;
+  rememberEdit();cue[key]=change.value;renderTimeline();if(key==='start'||key==='end')renderInspector();updatePreview(true);markEditorDirty();return true;
 }
 
 // Editor contextual: cada pista selecciona sus propias propiedades.
