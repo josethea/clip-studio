@@ -16,11 +16,22 @@ import {GlobalControls,FormatControls,PreviewControls} from './editor-controls.j
 import {ExportPage} from './export.jsx';
 import {RenamePanel} from './rename.jsx';
 import {GeminiPanel,KeysPanel,PromptsPanel} from './sidebar-tools.jsx';
+import {StudioShell} from './studio-shell.jsx';
+export {filesFromDrop} from './file-drop.jsx';
 
 const uiSlice=createSlice({
   name:'studioUi',
-  initialState:{globalControls:null,formatControls:null,previewControls:null,editorHistory:{canUndo:false,canRedo:false},exportView:{projectId:null,title:'',problems:['Crea o abre un proyecto'],summary:'',resolutionNote:'',exports:[],ready:null},exportProgress:{mp4:'',running:false,capcut:'',capcutRunning:false,capcutResult:null},renameView:{count:0,duplicates:0,message:''},transcript:null,project:null,projects:[],mediaAssets:null,mediaTarget:{selected:null,scenes:[]},mediaChapters:null,mediaAutofill:{projectId:null,sceneCount:0,entries:[],start:1,running:false,remaining:0,missingOnly:false,requirements:'',canRun:false},autofillProgress:{visible:false,percent:0,status:''},youtubeSources:{projectId:null,json:''},mediaMissing:null,mediaBoard:null,mediaStock:null,mediaPagination:{assets:null,media:null},mediaSession:{activeScene:0,assetTargetScene:null,provider:'storyblocks',type:'videos',query:'',searched:false,missingOnly:false,pexelsPage:0,storyblocksPage:0,googlePage:0},editorScene:null,editorSceneExtras:null,editorTemplates:[],editorMediaPicker:null,editorNarration:null,editorStoryboard:null,editorTimeline:null,editorInspector:null,editorSelection:null,editorInteraction:emptyEditorInteraction()},
+  initialState:{activeView:'project',activeSidebar:'gemini',sidebarCollapsed:false,projectIndicator:'Sin proyecto',notice:{message:'',bad:false},editorTitle:'Proyecto',editorDirty:'Todos los cambios guardados',previewSurface:{empty:true,status:'Los cambios se muestran al instante.'},busyView:{running:false,title:'Procesando…',detail:'Espera un momento.',percent:0},globalControls:null,formatControls:null,previewControls:null,editorHistory:{canUndo:false,canRedo:false},exportView:{projectId:null,title:'',problems:['Crea o abre un proyecto'],summary:'',resolutionNote:'',exports:[],ready:null},exportProgress:{mp4:'',running:false,capcut:'',capcutRunning:false,capcutResult:null},renameView:{count:0,duplicates:0,message:''},transcript:null,project:null,projects:[],mediaAssets:null,mediaTarget:{selected:null,scenes:[]},mediaChapters:null,mediaAutofill:{projectId:null,sceneCount:0,entries:[],start:1,running:false,remaining:0,missingOnly:false,requirements:'',canRun:false},autofillProgress:{visible:false,percent:0,status:''},youtubeSources:{projectId:null,json:''},mediaMissing:null,mediaBoard:null,mediaStock:null,mediaPagination:{assets:null,media:null},mediaSession:{activeScene:0,assetTargetScene:null,provider:'storyblocks',type:'videos',query:'',searched:false,missingOnly:false,pexelsPage:0,storyblocksPage:0,googlePage:0},editorScene:null,editorSceneExtras:null,editorTemplates:[],editorMediaPicker:null,editorNarration:null,editorStoryboard:null,editorTimeline:null,editorInspector:null,editorSelection:null,editorInteraction:emptyEditorInteraction()},
   reducers:{
+    setActiveView(state,action){state.activeView=action.payload;},
+    setActiveSidebar(state,action){state.activeSidebar=action.payload;},
+    toggleSidebar(state){state.sidebarCollapsed=!state.sidebarCollapsed;},
+    setProjectIndicator(state,action){state.projectIndicator=action.payload;},
+    setNotice(state,action){state.notice=action.payload;},
+    setEditorTitle(state,action){state.editorTitle=action.payload;},
+    setEditorDirty(state,action){state.editorDirty=action.payload;},
+    patchPreviewSurface(state,action){Object.assign(state.previewSurface,action.payload);},
+    patchBusyView(state,action){Object.assign(state.busyView,action.payload);},
     showGlobalControls(state,action){state.globalControls=action.payload;},
     showFormatControls(state,action){state.formatControls=action.payload;},
     showPreviewControls(state,action){state.previewControls=action.payload;},
@@ -62,6 +73,23 @@ function root(id){
   if(!roots.has(id))roots.set(id,createRoot(document.getElementById(id)));
   return roots.get(id);
 }
+
+let onShellNavigate=()=>{};
+export function mountStudioShell(onNavigate,onPreviewResize){
+  onShellNavigate=onNavigate;
+  flushSync(()=>root('app-root').render(<Provider store={store}><StudioShell onNavigate={navigateStudioView} onSidebar={id=>store.dispatch(uiSlice.actions.setActiveSidebar(id))} onToggleSidebar={()=>store.dispatch(uiSlice.actions.toggleSidebar())} onPreviewResize={onPreviewResize}/></Provider>));
+}
+export function navigateStudioView(view){
+  if(!['project','transcript','assets','editor','export'].includes(view))return;
+  flushSync(()=>store.dispatch(uiSlice.actions.setActiveView(view)));
+  onShellNavigate(view);
+}
+export const showProjectIndicator=value=>store.dispatch(uiSlice.actions.setProjectIndicator(value));
+export const showGlobalNotice=(message,bad=false)=>store.dispatch(uiSlice.actions.setNotice({message,bad}));
+export const showEditorTitle=value=>store.dispatch(uiSlice.actions.setEditorTitle(value));
+export const showEditorDirty=value=>store.dispatch(uiSlice.actions.setEditorDirty(value));
+export const patchPreviewSurface=patch=>store.dispatch(uiSlice.actions.patchPreviewSurface(patch));
+export const patchBusyView=patch=>store.dispatch(uiSlice.actions.patchBusyView(patch));
 
 export function renderGlobalSettings(view,actions){
   store.dispatch(uiSlice.actions.showGlobalControls(view));
@@ -129,7 +157,7 @@ export function renderMediaPagination(kind,view,actions){
   root(kind==='assets'?'asset-pagination':'media-pagination').render(<Provider store={store}><MediaPagination kind={kind} actions={actions}/></Provider>);
 }
 export function renderStockCards(view){store.dispatch(uiSlice.actions.showMediaStock(view));}
-export function mountMediaPage(){flushSync(()=>root('assets').render(<MediaPage/>));}
+export function mountMediaPage(actions){flushSync(()=>root('assets').render(<MediaPage actions={actions}/>));}
 export function getMediaSession(){return store.getState().studioUi.mediaSession;}
 export function patchMediaSession(patch){store.dispatch(uiSlice.actions.patchMediaSession(patch));}
 export function getEditorInteraction(){return store.getState().studioUi.editorInteraction;}

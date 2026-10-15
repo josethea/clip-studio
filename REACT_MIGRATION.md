@@ -1,6 +1,6 @@
 # Migración de Clip Studio a React
 
-La interfaz se migrará por módulos. La composición de Remotion ya usa React y seguirá siendo la fuente visual de la vista previa y el MP4.
+La interfaz se migró por módulos. La composición de Remotion usa React y sigue siendo la fuente visual de la vista previa y el MP4.
 
 ## Fase 1: base y transiciones (aplicada)
 
@@ -45,18 +45,18 @@ La interfaz se migrará por módulos. La composición de Remotion ya usa React y
 - La selección simple y múltiple del timeline, junto con la toma enfocada, reside en Redux. `editor-selection-model.mjs` calcula la selección y la reconcilia tras deshacer o rehacer; el controlador ya no conserva una segunda copia de esos datos.
 - Las reglas de edición de escenas, efectos, transiciones, audio, subtítulos, ajustes globales y recortes del timeline se validan en `editor-edit-model.mjs`. El controlador registra el estado previo para deshacer y luego aplica el cambio; el arrastre registra el estado previo una sola vez al comenzar.
 - La sesión de vista previa (`editor-preview-session.mjs`) mantiene el tiempo, la reproducción y la composición Remotion montada. Al cambiar de proyecto cancela una reproducción que estuviera esperando al Player; el controlador solo conecta el visor, la barra de transporte y el scroll del timeline.
-- Pendiente: trasladar el resto del estado editable y las acciones de guardado del controlador a módulos de dominio. El modelo de pistas aún se calcula completo antes de filtrar el render de React.
+- El estado de selección y los controles visibles viven en React y Redux. El controlador conserva la coordinación de guardado, API y operaciones de medios; el modelo de pistas aún se calcula completo antes de filtrar el render de React.
 
 ## Fase 4: exportación y limpieza
 
 - La pantalla de Exportación usa componentes React para validación, resolución de salida, progreso, enlaces de descarga, historial y paquete CapCut. La validación está separada en `export-view.mjs`; las tareas de render y CapCut conservan las llamadas de API existentes.
 - El panel lateral de Renombrar usa React para mostrar el conteo y habilitar la acción. La selección de carpeta y el progreso de archivos siguen usando la API del navegador y el diálogo de progreso existente.
 - Gemini, Claves y Prompts de la barra lateral usan componentes React. Las claves viven solo en memoria de la sesión, compartidas con las búsquedas manuales y automáticas mediante `credential-session.mjs`; el JSON de beats, el campo elegido y el resultado formateado son estado local del componente.
-- Pendiente: migrar otras operaciones del editor y Medios que todavía dependen del controlador.
-- Retirar `public/studio.js` y los selectores DOM directos después de pasar las pruebas de flujo completo.
+- La navegación, el contenedor del editor, la barra lateral, los avisos y el progreso global se montan ahora desde `ui/studio-shell.jsx`. `studio.html` solo conserva la raíz de React. La carga de archivos y carpetas de Medios usa `FileDrop`, y los divisores ajustables del editor reciben sus eventos desde el componente React. El controlador no registra manejadores generales para pestañas, barra lateral, zonas de carga ni divisores.
+- `public/studio.js` sigue siendo el coordinador de API, guardado, búsquedas, vista previa y exportación. Retirarlo por completo exige migrar esas operaciones de dominio; no es requisito para que la interfaz funcione en React. Las mediciones de tamaño del visor, el diálogo nativo de selección de medios y algunos scrolls siguen usando APIs DOM del navegador.
 - Comparar vista previa y MP4 en cortes/transiciones, textos, subtítulos, imagen y video.
 - Medir exportaciones de 5 y 30 minutos en el VPS antes de ajustar concurrencia de Remotion.
 
 El render usa dos procesos en paralelo por defecto. `CLIP_STUDIO_RENDER_CONCURRENCY=3` permite probar tres en el VPS; conviene comparar tiempo y memoria con el mismo proyecto antes de fijarlo. Este ajuste acelera el render cuando hay CPU disponible, pero no cambia la fluidez de la interfaz.
 
-La prueba de aceptación se hará con un proyecto nuevo, tanto localmente como en producción. La edición y exportación deben seguir funcionando antes de reemplazar el módulo siguiente.
+La compilación, las pruebas de modelos y la navegación se verifican localmente. Para dar por cerrada la aceptación de producción hace falta probar con un proyecto nuevo la importación de medios y la exportación de un MP4 largo en el VPS, y comparar fotogramas de vista previa y render en las transiciones, textos, subtítulos, imágenes y videos.
