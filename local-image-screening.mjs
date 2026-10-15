@@ -74,8 +74,18 @@ export async function screenLocalImage(file,width,height,options={}){
       return assessRecognizedText(data.blocks,width,height,assessment);
     }finally{signal?.removeEventListener('abort',onAbort);}
   }catch(error){
-    if(error.name==='AbortError'&&worker){slot.workerPromise=null;await worker.terminate().catch(()=>{});}
+    if(worker){slot.workerPromise=null;await worker.terminate().catch(()=>{});}
     else if(error.name!=='AbortError')slot.workerPromise=null;
     throw error;
   }finally{release(slot);}
+}
+
+export async function releaseIdleImageWorkers(){
+  await Promise.all(slots.filter(slot=>!slot.busy&&slot.workerPromise).map(async slot=>{
+    slot.busy=true;
+    const pending=slot.workerPromise;
+    slot.workerPromise=null;
+    try{const worker=await pending;await worker.terminate();}
+    catch{}finally{release(slot);}
+  }));
 }

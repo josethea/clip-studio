@@ -10,7 +10,8 @@ import {renderWithRemotion} from './remotion-render.mjs';
 import {signedStoryblocksUrl,rankStoryblocks,storyblocksDimensions,bestStoryblocksMp4,bestStoryblocksImage} from './storyblocks-api.mjs';
 import {pexelsSearchItems} from './stock-resolution.mjs';
 import {downloadGoogleImage} from './google-image-filter.mjs';
-import {screenLocalImage} from './local-image-screening.mjs';
+import {screenLocalImage,releaseIdleImageWorkers} from './local-image-screening.mjs';
+import {runMediaAutofillLanes} from './media-autofill-lanes.mjs';
 
 const ROOT=resolve(import.meta.dirname),DATA=join(ROOT,'data','studio'),TEMPLATE_STORE=join(DATA,'text-templates.json');mkdirSync(DATA,{recursive:true});
 const projects=new Map(),tasks=new Map();
@@ -264,16 +265,31 @@ async function autofillSequence(p,config,update,t){
   const sequence=validateAutofillSequence(config.sequence,config);
   const start=Math.max(0,Math.floor(Number(config.startIndex||1)-1));
   const missing=p.scenes.map((scene,i)=>({scene,i})).filter(({scene,i})=>i>=start&&!(scene.assetId&&asset(p,scene.assetId)));
-  let added=0,searched=0,storyblocksSearches=0;
-  for(const [ordinal,{scene,i}] of missing.entries()){
-    const choice=sequence[ordinal%sequence.length],chapter=p.chapters.find(c=>c.id===scene.chapterId);
+  const planned=missing.map((item,ordinal)=>({...item,ordinal,choice:sequence[ordinal%sequence.length]}));
+  let added=0,searched=0,completed=0,storyblocksSearches=0,storyblocksGate=Promise.resolve();
+  const settled=new Set();
+  t.currentScene=missing[0]?.i??start;t.completedScene=start-1;t.completedCount=0;
+  // Serialize only Storyblocks search admission, not its network request or video encoding.
+  // The 30-second pause therefore applies after every 50 searches across all lanes.
+  const storyblocksSlot=()=>{
+    const slot=storyblocksGate.then(async()=>{
+      if(storyblocksSearches>0&&storyblocksSearches%50===0){
+        for(let seconds=30;seconds>0;seconds--){update(t.progress,`Pausa de Storyblocks: ${seconds} s · ${added} medios asignados`);await new Promise(done=>setTimeout(done,1000));}
+      }
+      storyblocksSearches++;
+    });
+    storyblocksGate=slot.catch(()=>{});
+    return slot;
+  };
+  try{await runMediaAutofillLanes(planned,async({scene,i,choice})=>{
+    const chapter=p.chapters.find(c=>c.id===scene.chapterId);
     const query=String(scene.searchTerm||chapter?.searchTerms?.[(scene.chapterSceneIndex||0)%(chapter.searchTerms?.length||1)]||scene.text||'').trim();
-    t.currentScene=i;t.completedScene=i-1;
-    update(Math.round(5+ordinal/Math.max(1,missing.length)*90),`Escena ${i+1}/${p.scenes.length} · ${choice.provider} ${choice.type==='photos'?'imagen':'video'} · ${query||'sin término'}`);
+    update(Math.round(5+completed/Math.max(1,missing.length)*90),`Escena ${i+1}/${p.scenes.length} · ${choice.provider} ${choice.type==='photos'?'imagen':'video'} · ${query||'sin término'}`);
     if(query){
       searched++;
       if(choice.provider==='storyblocks'){
-        const result=await findStoryblocks(p,{publicKey:config.storyblocksPublic,secretKey:config.storyblocksSecret,query,type:choice.type});storyblocksSearches++;
+        await storyblocksSlot();
+        const result=await findStoryblocks(p,{publicKey:config.storyblocksPublic,secretKey:config.storyblocksSecret,query,type:choice.type});
         const chosen=result.items[0];if(chosen){const record=await importStoryblocks(p,{stockId:Number(chosen.id),name:chosen.name,publicKey:config.storyblocksPublic,secretKey:config.storyblocksSecret,type:chosen.type,sceneIndex:i,sourceDuration:chosen.duration});scene.assetId=record.id;scene.sourceStart=0;added++;save(p);}
       }else if(choice.provider==='pexels'){
         const chosen=await findPexelsForAutofill(query,choice.type,config.pexelsKey);
@@ -282,20 +298,21 @@ async function autofillSequence(p,config,update,t){
         const job=queueGoogleJob(p,query,i,{firstOnly:true});
         while(['queued','leased','screening'].includes(job.status)){
           if(Date.now()-job.createdAt>600000){job.status='error';job.detail='La búsqueda tardó más de 10 minutos. Comprueba la extensión y vuelve a intentar.';break;}
-          update(Math.round(5+ordinal/Math.max(1,missing.length)*90),`Escena ${i+1}/${p.scenes.length} · Google Images · ${job.detail}`);
+          update(Math.round(5+completed/Math.max(1,missing.length)*90),`Escena ${i+1}/${p.scenes.length} · Google Images · ${job.detail}`);
           await new Promise(done=>setTimeout(done,700));
         }
         if(job.status==='error')throw Error(`Escena ${i+1}: ${job.detail}`);
         if(job.items[0]){await importGoogleCandidate(p,job,job.items[0],i);added++;}
       }
     }
-    t.completedScene=i;t.added=added;t.searched=searched;
-    update(Math.round(5+(ordinal+1)/Math.max(1,missing.length)*90),`Escena ${i+1}/${p.scenes.length} ${scene.assetId?'completada':'sin resultado'} · ${added} medios asignados`);
-    if(storyblocksSearches>=50&&ordinal<missing.length-1){
-      storyblocksSearches=0;
-      for(let seconds=30;seconds>0;seconds--){update(t.progress,`Pausa de Storyblocks: ${seconds} s · ${added} medios asignados`);await new Promise(done=>setTimeout(done,1000));}
-    }
-  }
+  },{onSettled:({scene,i,ordinal})=>{
+    completed++;settled.add(ordinal);
+    let next=0;while(settled.has(next))next++;
+    t.completedScene=next?missing[next-1].i:start-1;
+    t.currentScene=missing[next]?.i??i;
+    t.completedCount=completed;t.added=added;t.searched=searched;
+    update(Math.round(5+completed/Math.max(1,missing.length)*90),`Escena ${i+1}/${p.scenes.length} ${scene.assetId?'completada':'sin resultado'} · ${added} medios asignados · ${completed}/${missing.length} procesadas`);
+  }});}finally{await releaseIdleImageWorkers();}
   return {added,searched,from:start+1,total:p.scenes.length,missing:p.scenes.filter(scene=>!scene.assetId||!asset(p,scene.assetId)).length};
 }
 
@@ -394,7 +411,7 @@ export async function studioRequest(req,res,url){
     if(req.method==='POST'&&action==='adjust-audio'){const input=await readJson(req),t=task(p,'audio',update=>adjustAudio(p,input,update));return json(res,202,t),true;}
     if(req.method==='POST'&&action==='sources'){const input=await readJson(req),t=task(p,'sources',update=>downloadChapters(p,input,update));return json(res,202,t),true;}
     if(req.method==='POST'&&action==='autofill'){const input=await readJson(req),t=task(p,'autofill',update=>autofillStoryblocks(p,input,update));return json(res,202,t),true;}
-    if(req.method==='POST'&&action==='google-autofill'){const input=await readJson(req),t=task(p,'google-autofill',update=>autofillGoogle(p,input,update));return json(res,202,t),true;}
+    if(req.method==='POST'&&action==='google-autofill'){const input=await readJson(req),t=task(p,'google-autofill',async update=>{try{return await autofillGoogle(p,input,update);}finally{await releaseIdleImageWorkers();}});return json(res,202,t),true;}
     if(req.method==='POST'&&action==='autofill-sequence'){const input=await readJson(req);validateAutofillSequence(input.sequence,input);const t=task(p,'autofill-sequence',(update,taskState)=>autofillSequence(p,input,update,taskState));return json(res,202,t),true;}
     if(req.method==='GET'&&action.startsWith('tasks/')){const id=action.slice(6),t=tasks.get(id);return json(res,t?200:404,t||{error:'Tarea no encontrada'}),true;}
     if(req.method==='GET'&&action.startsWith('files/')){const name=basename(action.slice(6));streamFile(req,res,join(dirOf(p),'renders',name),name.endsWith('.srt')?'text/plain; charset=utf-8':name.endsWith('.wav')?'audio/wav':name.endsWith('.zip')?'application/zip':'video/mp4');return true;}

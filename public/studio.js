@@ -290,14 +290,14 @@ const storyboardActions={
 };
 subscribeCredentials(renderAutofillControls);
 async function followAutofillSequence(taskId,projectId,runId){
-  let seenCompleted=-2,seenCurrent=-2;
+  let seenCompleted=-2,seenCurrent=-2,seenCount=-1;
   for(;;){
     if(runId!==state.autofillRunId||state.project?.id!==projectId)return null;
     const current=await mediaService.getTask(projectId,taskId);
     if(runId!==state.autofillRunId||state.project?.id!==projectId)return null;
     patchAutofillProgress({visible:true,percent:current.progress,status:`${current.progress}% · ${current.detail}${current.error?` · ${current.error}`:''}`});
-    if(current.completedScene!==seenCompleted||current.currentScene!==seenCurrent||current.status!=='running'){
-      seenCompleted=current.completedScene;seenCurrent=current.currentScene;
+    if(current.completedScene!==seenCompleted||current.currentScene!==seenCurrent||current.completedCount!==seenCount||current.status!=='running'){
+      seenCompleted=current.completedScene;seenCurrent=current.currentScene;seenCount=current.completedCount;
       const project=await mediaService.getProject(projectId);
       if(runId!==state.autofillRunId||state.project?.id!==projectId)return null;
       state.project=project;
