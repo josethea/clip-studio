@@ -7,6 +7,7 @@
     "build:preview": "node build-preview.mjs",
     "check:browser": "node check-browser.mjs",
     "smoke:render": "node scripts/smoke-render.mjs",
+    "optimize:preview": "node scripts/optimize-preview-assets.mjs",
     "start": "node build-preview.mjs && node server.mjs"
   },
   "engines": {

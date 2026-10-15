@@ -26,13 +26,13 @@ function motionStyle(scene,progress){
     default:return {};
   }
 }
-function Media({asset,scene,style,preview=false}){
+function Media({asset,scene,style,preview=false,bufferingActive=false}){
   if(!asset)return null;
   if(asset.type==='image')return <Img src={asset.url} style={style} delayRenderTimeoutInMilliseconds={90000} delayRenderRetries={2}/>;
   const props={src:asset.url,muted:true,trimBefore:Math.max(0,Math.round((Number(scene.sourceStart)||0)*30)),style,delayRenderTimeoutInMilliseconds:90000,delayRenderRetries:2};
-  return asset.offthread?<OffthreadVideo {...props}/>:<Html5Video {...props} loop preload={preview?'auto':undefined} pauseWhenBuffering={preview}/>;
+  return asset.offthread?<OffthreadVideo {...props}/>:<Html5Video {...props} loop preload={preview?'auto':undefined} pauseWhenBuffering={preview&&bufferingActive}/>;
 }
-function SceneLayer({scene,assets,time,preview=false}){
+function SceneLayer({scene,assets,time,preview=false,bufferingActive=false}){
   const asset=assets[scene.assetId],length=Math.max(.05,scene.end-scene.start),p=clamp((time-scene.start)/length);
   const common={position:'absolute',width:'100%',height:'100%',objectFit:scene.fit==='fill'?'cover':'contain',...motionStyle(scene,p)};
   const blurredBackground=scene.fit==='blur'||scene.fit==='frame';
@@ -42,8 +42,8 @@ function SceneLayer({scene,assets,time,preview=false}){
   const entrance=clamp((time-overlayStart)/.3);
   return <AbsoluteFill data-scene-id={scene.id} style={{overflow:'hidden',background:'#08080a'}}>
     <AbsoluteFill style={{filter:effects[scene.effect]||'none'}}>
-      {blurredBackground&&asset&&<><Media asset={asset} scene={scene} preview={preview} style={{...common,objectFit:'cover',filter:`blur(${Math.max(2,Number(scene.blur)||20)}px) brightness(${1-dim/2})`,transform:`scale(1.08) ${common.transform||''}`}}/><AbsoluteFill style={{background:`rgba(0,0,0,${dim/2})`}}/></>}
-      {scene.fit==='frame'?<AbsoluteFill style={{padding:'5%',display:'grid',placeItems:'center'}}><div style={{position:'relative',width:'100%',height:'100%',overflow:'hidden'}}><Media asset={asset} scene={scene} preview={preview} style={{...common,objectFit:'contain'}}/></div></AbsoluteFill>:<Media asset={asset} scene={scene} preview={preview} style={common}/>}
+      {blurredBackground&&asset&&<><Media asset={asset} scene={scene} preview={preview} bufferingActive={bufferingActive} style={{...common,objectFit:'cover',filter:`blur(${Math.max(2,Number(scene.blur)||20)}px) brightness(${1-dim/2})`,transform:`scale(1.08) ${common.transform||''}`}}/><AbsoluteFill style={{background:`rgba(0,0,0,${dim/2})`}}/></>}
+      {scene.fit==='frame'?<AbsoluteFill style={{padding:'5%',display:'grid',placeItems:'center'}}><div style={{position:'relative',width:'100%',height:'100%',overflow:'hidden'}}><Media asset={asset} scene={scene} preview={preview} bufferingActive={bufferingActive} style={{...common,objectFit:'contain'}}/></div></AbsoluteFill>:<Media asset={asset} scene={scene} preview={preview} bufferingActive={bufferingActive} style={common}/>}
     </AbsoluteFill>
     {overlay?.type==='image'&&time>=overlayStart&&time<overlayEnd&&<Img src={overlay.url} delayRenderTimeoutInMilliseconds={90000} delayRenderRetries={2} style={{position:'absolute',width:`${clamp(Number(scene.overlaySize)||35,5,90)}%`,height:'auto',maxHeight:'70%',objectFit:'contain',opacity:clamp(Number(scene.overlayOpacity??100)/100)*entrance,...(positions[scene.overlayPosition]||positions.center),filter:'drop-shadow(0 8px 14px #0008)',translate:scene.overlayAnimation==='slide'?`${(1-entrance)*-12}% 0`:undefined,scale:scene.overlayAnimation==='pop'?String(.7+.3*entrance):undefined}}/>}
   </AbsoluteFill>;
@@ -95,7 +95,7 @@ export function StudioComposition({project}){
       return [
         ...(presentation?[<TransitionSeries.Transition key={`transition-${i}`} timing={linearTiming({durationInFrames:previous.transitionFrames})} presentation={presentation}/>]:[]),
         <TransitionSeries.Sequence key={`scene-${i}`} durationInFrames={sceneFrames[i].durationInFrames} premountFor={project.preview?120:0}>
-          <SceneLayer scene={scene} assets={assets} time={time} preview={project.preview}/>
+          <SceneLayer scene={scene} assets={assets} time={time} preview={project.preview} bufferingActive={time>=scene.start-(previous?.transitionFrames||0)/fps}/>
         </TransitionSeries.Sequence>
       ];
     })}</TransitionSeries>

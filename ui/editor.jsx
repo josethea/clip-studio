@@ -74,6 +74,7 @@ export function TimelineView({actions}){
     const current=drag.current;if(!current)return;
     drag.current=null;
     if(current.kind==='playhead'){
+      if(current.frame)cancelAnimationFrame(current.frame);
       if(event.type==='pointerup')actions.seek(atTime(event));
       if(current.resume)actions.resumeDrag();
     }else if(current.started)actions.finishEdit();
@@ -107,7 +108,11 @@ export function TimelineView({actions}){
   };
   const move=event=>{
     const current=drag.current;if(!current)return;
-    if(current.kind==='playhead'){actions.seek(atTime(event));return;}
+    if(current.kind==='playhead'){
+      current.nextTime=atTime(event);
+      if(!current.frame)current.frame=requestAnimationFrame(()=>{current.frame=0;if(drag.current===current)actions.seek(current.nextTime);});
+      return;
+    }
     if(!current.started&&Math.abs(event.clientX-current.clientX)<3)return;
     if(!current.started){actions.beginEdit();current.started=true;}
     if(current.kind==='text'){

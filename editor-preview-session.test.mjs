@@ -42,6 +42,19 @@ test('a buffering or temporarily detached video cannot jump the transport to zer
   assert.equal(preview.time,4.5);
 });
 
+test('scrubbing updates the transport without serializing the full composition on every pointer move',()=>{
+  const p=project();let serializations=0,seeks=0;
+  p.scenes[0].toJSON=function(){serializations++;return {start:this.start,end:this.end};};
+  const player={mount:()=>{},update:()=>{},seek:()=>{seeks++;},pause:()=>{},unmount:()=>{}};
+  const preview=createPreviewSession({getProject:()=>p,isEditorActive:()=>true,player,prepare:()=>({}),origin:()=>''});
+  preview.refresh(true);
+  const before=serializations;
+  for(let i=0;i<40;i++)preview.seek(i/10);
+  assert.equal(serializations,before);
+  assert.equal(seeks,40);
+  assert.equal(preview.time,3.9);
+});
+
 test('reset cancels a pending play before it reaches the old project',async()=>{
   const p=project(),calls=[];
   let resume;

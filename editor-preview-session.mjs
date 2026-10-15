@@ -9,7 +9,7 @@ export function createPreviewSession({getProject,isEditorActive,player,prepare,o
     if(project.scenes.length&&isEditorActive()&&(force||!rendered)){
       const next=compositionSnapshot(project);
       if(next!==snapshot){
-        const composition={...prepare(project,origin()),preview:true};
+        const composition={...prepare(project,origin(),{preview:true}),preview:true};
         if(!rendered)player.mount(composition,frame(),false);
         else player.update(composition);
         snapshot=next;rendered=true;onComposition();onResize();
@@ -25,7 +25,7 @@ export function createPreviewSession({getProject,isEditorActive,player,prepare,o
     const project=getProject();if(!project)return;
     time=Math.max(0,Math.min(duration(project),Number(value)||0));
     if(rendered)player.seek(frame());
-    refresh();
+    onTransport({time,duration:duration(project),playing});
   }
 
   async function play(value){

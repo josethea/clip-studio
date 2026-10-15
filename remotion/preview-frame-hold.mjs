@@ -84,11 +84,17 @@ export function createPreviewFrameHold(stage,canvas){
     pendingFrame=requestAnimationFrame(check);
   }
 
+  function clear(){
+    releaseId++;
+    if(pendingFrame!==null)cancelAnimationFrame(pendingFrame);
+    pendingFrame=null;held=false;releaseRunning=false;canvas.hidden=true;
+  }
+
   return {
     capture,
-    seek(frame){capture(true);show();if(held)releaseWhenReady(frame,true);},
+    seek(frame,hold=true){capture(true);if(!hold){clear();return;}show();if(held)releaseWhenReady(frame,true);},
     waiting(){if(!ready(null)){show();if(held)releaseWhenReady(null);}},
     resume(){if(held)releaseWhenReady(null);else capture(true);},
-    reset(){releaseId++;if(pendingFrame!==null)cancelAnimationFrame(pendingFrame);pendingFrame=null;held=false;releaseRunning=false;hasFrame=false;if(canvas)canvas.hidden=true;}
+    reset(){clear();hasFrame=false;}
   };
 }

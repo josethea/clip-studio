@@ -9,7 +9,8 @@ const root=createRoot(node);
 const frameHold=createPreviewFrameHold(document.getElementById('preview-stage'),document.getElementById('preview-frame-hold'));
 let ref=null,currentProject=null,lastFrame=-1,attachedRef=null,waitingSince=null;
 const diagnostics={waiting:0,resume:0,bufferingMs:0};
-const onWaiting=()=>{if(waitingSince!==null)return;waitingSince=performance.now();diagnostics.waiting++;frameHold.waiting();window.dispatchEvent(new CustomEvent('clip-studio-player-buffering',{detail:{buffering:true}}));};
+const assetTypeAt=(project,frame)=>{const scene=project?.scenes?.findLast(item=>item.start<=frame/30);return project?.assets?.find(item=>item.id===scene?.assetId)?.type;};
+const onWaiting=()=>{if(waitingSince!==null)return;waitingSince=performance.now();diagnostics.waiting++;if(assetTypeAt(currentProject,ref?.getCurrentFrame()??lastFrame)!=='image')frameHold.waiting();window.dispatchEvent(new CustomEvent('clip-studio-player-buffering',{detail:{buffering:true}}));};
 const onResume=()=>{if(waitingSince!==null){diagnostics.bufferingMs+=performance.now()-waitingSince;waitingSince=null;}diagnostics.resume++;frameHold.resume();window.dispatchEvent(new CustomEvent('clip-studio-player-buffering',{detail:{buffering:false}}));};
 const onFrameUpdate=()=>frameHold.capture();
 function attach(next){
@@ -28,8 +29,8 @@ function mount(project,frame=0,playing=false){
 }
 window.clipStudioPlayer={
   mount,
-  update:project=>{const frame=ref?.getCurrentFrame()||lastFrame||0,playing=ref?.isPlaying()||false;frameHold.seek(frame);mount(project,frame,playing);},
-  play:()=>ref?.play(),pause:()=>ref?.pause(),seek:frame=>{frameHold.seek(frame);lastFrame=frame;ref?.seekTo(frame);},
+  update:project=>{const frame=ref?.getCurrentFrame()||lastFrame||0,playing=ref?.isPlaying()||false;frameHold.seek(frame,assetTypeAt(project,frame)!=='image');mount(project,frame,playing);},
+  play:()=>ref?.play(),pause:()=>ref?.pause(),seek:frame=>{frameHold.seek(frame,assetTypeAt(currentProject,frame)!=='image');lastFrame=frame;ref?.seekTo(frame);},
   frame:()=>ref?.getCurrentFrame()??null,
   playing:()=>ref?.isPlaying()||false,
   buffering:()=>waitingSince!==null,
