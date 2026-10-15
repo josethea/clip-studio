@@ -1,5 +1,22 @@
 export const MEDIA_PAGE_SIZE=15;
 
+export function saveAutofillSource(sequence,{index,type,provider}){
+  if(type==='videos'&&provider==='google')throw Error('Google Images solo permite imágenes');
+  if(!['videos','photos'].includes(type)||!['google','pexels','storyblocks'].includes(provider))throw Error('Fuente de medios inválida');
+  const current=Array.isArray(sequence)?sequence:[];
+  if(index===-1){
+    if(current.length>=40)throw Error('La secuencia admite hasta 40 fuentes');
+    return [...current.map(entry=>({...entry})),{type,provider}];
+  }
+  if(!Number.isInteger(index)||!current[index])throw Error('Fuente de medios no disponible');
+  return current.map((entry,position)=>position===index?{type,provider}:{...entry});
+}
+
+export function removeAutofillSource(sequence,index){
+  const current=Array.isArray(sequence)?sequence:[];
+  return current.filter((_,position)=>position!==index).map(entry=>({...entry}));
+}
+
 export function missingMediaIndices(project){
   if(!project)return [];
   const available=new Set((project.assets||[]).map(asset=>asset.id));

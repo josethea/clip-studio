@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {missingMediaIndices,mediaBoardView,nextMissingScene,pagination,sceneSearchTerm} from './media-board-model.mjs';
+import {missingMediaIndices,mediaBoardView,nextMissingScene,pagination,sceneSearchTerm,saveAutofillSource,removeAutofillSource} from './media-board-model.mjs';
 
 test('storyboard missing view paginates only unresolved scenes and retains their chapter and cue range',()=>{
   const project={id:'p',assets:[{id:'a',name:'Foto',type:'image'}],chapters:[{id:7,name:'Capítulo 7'}],scenes:Array.from({length:36},(_,index)=>({start:index,end:index+1,text:`Bloque ${index+1}`,searchTerm:`Término ${index+1}`,cueStart:index*2,cueEnd:index*2+1,chapterId:7,assetId:index%3===0?'a':null}))};
@@ -30,4 +30,18 @@ test('a completed storyboard exits missing-only mode and clamps its page',()=>{
   assert.equal(view.rows[0].asset.name,'Image');
   assert.deepEqual(pagination(0,100),{pages:0,current:0,total:0});
   assert.equal(sceneSearchTerm({text:'  '.padEnd(170,'a')}).length,160);
+});
+
+test('autofill sources can be added, edited and removed when Redux froze the previous list',()=>{
+  const first=Object.freeze({type:'photos',provider:'google'});
+  const previous=Object.freeze([first]);
+  const added=saveAutofillSource(previous,{index:-1,type:'videos',provider:'pexels'});
+  assert.deepEqual(added,[first,{type:'videos',provider:'pexels'}]);
+  assert.notEqual(added,previous);
+  assert.notEqual(added[0],first);
+  const edited=saveAutofillSource(Object.freeze(added),{index:0,type:'photos',provider:'storyblocks'});
+  assert.deepEqual(edited,[{type:'photos',provider:'storyblocks'},{type:'videos',provider:'pexels'}]);
+  const removed=removeAutofillSource(Object.freeze(edited),1);
+  assert.deepEqual(removed,[{type:'photos',provider:'storyblocks'}]);
+  assert.deepEqual(previous,[first]);
 });
