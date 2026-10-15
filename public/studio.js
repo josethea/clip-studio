@@ -13,7 +13,7 @@ import {createTextLayer,templateStylePatch,textFieldValue,subtitleFieldValue} fr
 import {sceneFieldEdit,effectOverrideEdit,transitionOverrideEdit,transitionDurationEdit,inheritTransitionEdit,sceneSfxEdit,audioSelectionEdit,musicVolumeEdit,captionSettingEdit,multiEffectEdit,multiHideSubtitlesEdit,multiDeleteTextEdit,overlayEdit,toggleSequenceEdit,settingEdit,moveTextEdit,trimBoundaryEdit,trimCueEdit} from '/editor-edit-model.mjs';
 import {refreshChapterMapping,buildStoryboard,assignInitialAssets} from '/storyboard-model.mjs';
 import {ensureEditorSettings,migrateLegacySources,sourceCount} from '/project-model.mjs';
-import {renderGlobalSettings,renderFormatSettings,renderPreviewTransport,renderExportPage,patchExportProgress,renderRenamePanel,mountSidebarTools,renderTranscriptPanel,renderProjectPanel,renderProjectOptions,renderAssetLibrary,renderAssetTarget,renderChapterGroups,renderAutofillPanel,patchAutofillProgress,renderYoutubeSources,renderMissingSummary,renderStoryboard,renderStockCards,renderMediaPagination,renderSceneInspector,renderSceneExtras,renderTemplatePanel,renderEditorMediaPicker,renderNarrationPanel,renderStoryboardSettings,mountEditorInspector,renderEditorTimeline,renderEditorHistory,renderEditorInspector,renderInspectorSelection,mountMediaPage,getMediaSession,patchMediaSession,getEditorInteraction,patchEditorInteraction,selectEditorInteraction,restoreEditorSelection,mountStudioShell,navigateStudioView,showProjectIndicator,showGlobalNotice,showEditorTitle,showEditorDirty,patchPreviewSurface,patchBusyView,filesFromDrop} from '/studio-ui.js';
+import {renderGlobalSettings,renderFormatSettings,renderPreviewTransport,renderExportPage,patchExportProgress,renderRenamePanel,mountSidebarTools,renderTranscriptPanel,renderProjectPanel,renderProjectOptions,renderAssetLibrary,renderAssetTarget,renderChapterGroups,renderAutofillPanel,patchAutofillProgress,renderYoutubeSources,renderMissingSummary,renderStoryboard,renderStockCards,renderMediaPagination,renderSceneInspector,renderSceneExtras,renderTemplatePanel,renderEditorMediaPicker,renderNarrationPanel,renderStoryboardSettings,mountEditorInspector,renderEditorTimeline,renderEditorHistory,renderEditorInspector,renderInspectorSelection,mountMediaPage,getMediaSession,patchMediaSession,getEditorInteraction,patchEditorInteraction,selectEditorInteraction,restoreEditorSelection,mountStudioShell,navigateStudioView,showProjectIndicator,showGlobalNotice,showPreviewStatus,showEditorTitle,showEditorDirty,patchPreviewSurface,patchBusyView,filesFromDrop} from '/studio-ui.js';
 mountStudioShell(view=>{if(view==='export')renderExport();if(view==='editor'){updatePreview(true);requestAnimationFrame(sizePreviewStage);}},sizePreviewStage,()=>globalActions.save());
 await import('/remotion-player.js');
 mountMediaPage({file:(id,files)=>{void withError(async()=>receiveInput(id,files))();}});
@@ -119,13 +119,13 @@ const preview=createPreviewSession({
   player:window.clipStudioPlayer,
   prepare:prepareRemotionProject,
   origin:()=>location.origin,
-  onComposition:()=>patchPreviewSurface({empty:false,status:'Composición actualizada. Los cambios se ven sin generar MP4.'}),
+  onComposition:()=>patchPreviewSurface({empty:false}),
   onTransport:view=>renderPreviewTransport(view,previewActions),
   getScale:()=>state.timelineScale,
   getScroll:()=>$('timeline-scroll'),
   onResize:sizePreviewStage
 });
-window.addEventListener('clip-studio-player-buffering',event=>patchPreviewSurface({status:event.detail.buffering?'Cargando el siguiente video…':'Vista previa lista'}));
+window.addEventListener('clip-studio-player-buffering',event=>showPreviewStatus(event.detail.buffering?'Preparando video en vista previa…':''));
 function updatePreview(refresh=false){preview.refresh(refresh);}
 function seekExact(time){preview.seek(time);}
 async function setPreviewPlaying(value){await preview.play(value);}

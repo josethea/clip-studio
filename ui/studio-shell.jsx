@@ -17,7 +17,7 @@ function EditorWorkspace({onPreviewResize,onGlobalSave}){
     <div className="editor-workspace" id="editor-workspace">
       <div className="editor-main-grid" id="editor-main-grid">
         <div className="editor-top-grid" id="editor-top-grid">
-          <div className="editor-center"><article className="editor-monitor"><div className="editor-monitor-head"><strong>VISTA PREVIA · REMOTION</strong><span id="preview-render-status">{surface.status}</span></div><div id="preview-stage" className="preview-stage exact-preview"><div id="remotion-preview"/><video id="rendered-preview" hidden/><div id="preview-empty" hidden={!surface.empty}>Crea el storyboard para visualizar el montaje.</div></div><div id="preview-controls" className="preview-controls"/></article></div>
+          <div className="editor-center"><article className="editor-monitor"><div className="editor-monitor-head"><strong>VISTA PREVIA · REMOTION</strong></div><div id="preview-stage" className="preview-stage exact-preview"><div id="remotion-preview"/><canvas id="preview-frame-hold" hidden aria-hidden="true"/><video id="rendered-preview" hidden/><div id="preview-empty" hidden={!surface.empty}>Crea el storyboard para visualizar el montaje.</div></div><div id="preview-controls" className="preview-controls"/></article></div>
           <div className="editor-resize-handle editor-resize-inspector" data-editor-resize="inspector" title="Arrastra para cambiar el ancho de Ajustes específicos" role="separator" aria-label="Ajustar ancho de Ajustes específicos" aria-orientation="vertical" tabIndex={0} onPointerDown={event=>resize.pointerDown('inspector',event)} onKeyDown={event=>resize.keyDown('inspector',event)} onDoubleClick={()=>resize.reset('inspector')}/>
           <aside className="editor-inspector" aria-label="Propiedades de selección"><div id="inspector-app"/></aside>
         </div>
@@ -44,11 +44,12 @@ export function StudioShell({onNavigate,onSidebar,onToggleSidebar,onPreviewResiz
   const view=useSelector(state=>state.studioUi.activeView);
   const sidebar=useSelector(state=>state.studioUi.activeSidebar);
   const collapsed=useSelector(state=>state.studioUi.sidebarCollapsed);
-  const indicator=useSelector(state=>state.studioUi.projectIndicator);
   const notice=useSelector(state=>state.studioUi.notice);
+  const previewStatus=useSelector(state=>state.studioUi.previewStatus);
+  const message=previewStatus||notice.message||'Listo para editar';
   return <>
-    <header className="topbar"><div className="brand"><div className="brand-icon">✧</div><div><strong>Clip Studio</strong><small>Guion · medios · edición · exportación</small></div><span className="brand-tag">STUDIO</span></div><nav className="tabs" aria-label="Módulos">{pages.map(([id,label])=><button key={id} className={`tab ${view===id?'active':''}`} data-view={id} onClick={()=>onNavigate(id)}>{label}</button>)}</nav><div id="global-message" className={`topbar-notice ${notice.bad?'bad':''}`} role="status" aria-live="polite" title={notice.message}>{notice.message||'Listo para editar'}</div><div className="system"><span className="pill blue">Remotion + FFmpeg</span><span className="pill green">● Listo</span></div></header>
-    <div className="app-shell"><main><div className="status-banner"><span>● &nbsp; Proyecto guardado en esta instalación. Los medios y la edición quedan disponibles al volver.</span><span id="project-indicator">{indicator}</span></div>
+    <header className="topbar"><div className="brand"><div className="brand-icon">✧</div><div><strong>Clip Studio</strong><small>Guion · medios · edición · exportación</small></div><span className="brand-tag">STUDIO</span></div><nav className="tabs" aria-label="Módulos">{pages.map(([id,label])=><button key={id} className={`tab ${view===id?'active':''}`} data-view={id} onClick={()=>onNavigate(id)}>{label}</button>)}</nav><div id="global-message" className={`topbar-notice ${notice.bad&&!previewStatus?'bad':''}`} role="status" aria-live="polite" title={message}>{message}</div><div className="system"><span className="pill blue">Remotion + FFmpeg</span></div></header>
+    <div className="app-shell"><main>
       <section className={`page ${view==='project'?'active':''}`} id="project"><div id="project-app"/></section>
       <section className={`page ${view==='transcript'?'active':''}`} id="transcript"><div id="transcript-app"/></section>
       <section className={`page ${view==='assets'?'active':''}`} id="assets"/>

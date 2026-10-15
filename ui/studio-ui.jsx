@@ -23,13 +23,14 @@ export {getCredential,subscribeCredentials} from '../credential-session.mjs';
 
 const uiSlice=createSlice({
   name:'studioUi',
-  initialState:{activeView:'project',activeSidebar:'gemini',sidebarCollapsed:false,projectIndicator:'Sin proyecto',notice:{message:'',bad:false},editorTitle:'Proyecto',editorDirty:'Todos los cambios guardados',previewSurface:{empty:true,status:'Los cambios se muestran al instante.'},busyView:{running:false,title:'Procesando…',detail:'Espera un momento.',percent:0},globalControls:null,formatControls:null,previewControls:null,editorHistory:{canUndo:false,canRedo:false},exportView:{projectId:null,title:'',problems:['Crea o abre un proyecto'],summary:'',resolutionNote:'',exports:[],ready:null},exportProgress:{mp4:'',running:false,capcut:'',capcutRunning:false,capcutResult:null},renameView:{count:0,duplicates:0,message:''},transcript:null,project:null,projects:[],mediaAssets:null,mediaTarget:{selected:null,scenes:[]},mediaChapters:null,mediaAutofill:{projectId:null,sceneCount:0,entries:[],start:1,running:false,remaining:0,missingOnly:false,requirements:'',canRun:false},autofillProgress:{visible:false,percent:0,status:''},youtubeSources:{projectId:null,json:''},mediaMissing:null,mediaBoard:null,mediaStock:null,mediaPagination:{assets:null,media:null},mediaSession:{activeScene:0,assetTargetScene:null,provider:'storyblocks',type:'videos',query:'',searched:false,missingOnly:false,pexelsPage:0,storyblocksPage:0,googlePage:0},editorScene:null,editorSceneExtras:null,editorTemplates:[],editorMediaPicker:null,editorNarration:null,editorStoryboard:null,editorTimeline:null,editorInspector:null,editorSelection:null,editorInteraction:emptyEditorInteraction()},
+  initialState:{activeView:'project',activeSidebar:'gemini',sidebarCollapsed:false,projectIndicator:'Sin proyecto',notice:{message:'',bad:false},previewStatus:'',editorTitle:'Proyecto',editorDirty:'Todos los cambios guardados',previewSurface:{empty:true,status:'Los cambios se muestran al instante.'},busyView:{running:false,title:'Procesando…',detail:'Espera un momento.',percent:0},globalControls:null,formatControls:null,previewControls:null,editorHistory:{canUndo:false,canRedo:false},exportView:{projectId:null,title:'',problems:['Crea o abre un proyecto'],summary:'',resolutionNote:'',exports:[],ready:null},exportProgress:{mp4:'',running:false,capcut:'',capcutRunning:false,capcutResult:null},renameView:{count:0,duplicates:0,message:''},transcript:null,project:null,projects:[],mediaAssets:null,mediaTarget:{selected:null,scenes:[]},mediaChapters:null,mediaAutofill:{projectId:null,sceneCount:0,entries:[],start:1,running:false,remaining:0,missingOnly:false,requirements:'',canRun:false},autofillProgress:{visible:false,percent:0,status:''},youtubeSources:{projectId:null,json:''},mediaMissing:null,mediaBoard:null,mediaStock:null,mediaPagination:{assets:null,media:null},mediaSession:{activeScene:0,assetTargetScene:null,provider:'storyblocks',type:'videos',query:'',searched:false,missingOnly:false,pexelsPage:0,storyblocksPage:0,googlePage:0},editorScene:null,editorSceneExtras:null,editorTemplates:[],editorMediaPicker:null,editorNarration:null,editorStoryboard:null,editorTimeline:null,editorInspector:null,editorSelection:null,editorInteraction:emptyEditorInteraction()},
   reducers:{
     setActiveView(state,action){state.activeView=action.payload;},
     setActiveSidebar(state,action){state.activeSidebar=action.payload;},
     toggleSidebar(state){state.sidebarCollapsed=!state.sidebarCollapsed;},
     setProjectIndicator(state,action){state.projectIndicator=action.payload;},
     setNotice(state,action){state.notice=action.payload;},
+    setPreviewStatus(state,action){state.previewStatus=action.payload;},
     setEditorTitle(state,action){state.editorTitle=action.payload;},
     setEditorDirty(state,action){state.editorDirty=action.payload;},
     patchPreviewSurface(state,action){Object.assign(state.previewSurface,action.payload);},
@@ -88,6 +89,7 @@ export function navigateStudioView(view){
 }
 export const showProjectIndicator=value=>store.dispatch(uiSlice.actions.setProjectIndicator(value));
 export const showGlobalNotice=(message,bad=false)=>store.dispatch(uiSlice.actions.setNotice({message,bad}));
+export const showPreviewStatus=message=>store.dispatch(uiSlice.actions.setPreviewStatus(message));
 export const showEditorTitle=value=>store.dispatch(uiSlice.actions.setEditorTitle(value));
 export const showEditorDirty=value=>store.dispatch(uiSlice.actions.setEditorDirty(value));
 export const patchPreviewSurface=patch=>store.dispatch(uiSlice.actions.patchPreviewSurface(patch));
