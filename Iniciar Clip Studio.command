@@ -1,6 +1,6 @@
 #!/bin/zsh -l
 cd "${0:A:h}"
-for tool in node ffmpeg ffprobe swift; do
+for tool in node ffmpeg ffprobe; do
   if ! command -v "$tool" >/dev/null 2>&1; then
     echo "Falta $tool. Instálalo y vuelve a abrir Clip Studio."
     read -k 1

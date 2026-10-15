@@ -64,7 +64,7 @@ export async function renderWithRemotion(project,folder,update){
   update(9,'Preparando imágenes para exportar');
   await prepareRenderImages(project,folder,prepared,update);
   update(11,'Preparando la composición');
-  bundlePromise??=bundle({entryPoint:join(ROOT,'remotion/root.jsx'),outDir:join(ROOT,'.remotion-bundle'),onProgress:p=>update(11+Math.round(p),'Preparando motor de video')}).catch(e=>{bundlePromise=null;throw e;});
+  bundlePromise??=bundle({entryPoint:join(ROOT,'remotion/root.jsx'),outDir:join(ROOT,'.remotion-bundle'),onProgress:p=>update(11+Math.round(Math.max(0,Math.min(100,p))*.14),`Preparando motor de video · ${Math.round(p)}%`)}).catch(e=>{bundlePromise=null;throw e;});
   const serveUrl=await bundlePromise,options={serveUrl};
   if(process.env.CLIP_STUDIO_CHROME)options.browserExecutable=process.env.CLIP_STUDIO_CHROME;
   const name=`video-${Date.now()}.mp4`,output=join(work,name),quality=exportEncodingOptions(project.settings);
@@ -72,6 +72,7 @@ export async function renderWithRemotion(project,folder,update){
   mkdirSync(checkpoint,{recursive:true});
   const videoProps={project:{...prepared,videoOnly:true}};
   try{
+    update(25,'Iniciando Chrome y preparando el render');
     const composition=await selectComposition({...options,id:'ClipStudio',inputProps:videoProps});
     const totalFrames=composition.durationInFrames,segments=Math.ceil(totalFrames/CHUNK_FRAMES),files=[];
     for(let index=0;index<segments;index++){
@@ -79,14 +80,14 @@ export async function renderWithRemotion(project,folder,update){
       const file=join(checkpoint,`segment-${String(index).padStart(4,'0')}.mp4`);
       files.push(file);
       if(await validVideo(file,count)){
-        update(12+Math.round((index+1)/segments*78),`Tramo ${index+1}/${segments} ya guardado`);
+        update(25+Math.round((index+1)/segments*65),`Tramo ${index+1}/${segments} ya guardado`);
         continue;
       }
       const temporary=join(checkpoint,`segment-${String(index).padStart(4,'0')}.${process.pid}.tmp.mp4`);
       for(let attempt=1;attempt<=2;attempt++){
         try{
-          update(12+Math.round(index/segments*78),`Renderizando tramo ${index+1}/${segments}${attempt>1?' · segundo intento':''}`);
-          await renderMedia({...options,composition,inputProps:videoProps,codec:'h264',...quality,outputLocation:temporary,overwrite:true,muted:true,frameRange:[from,to],concurrency:renderConcurrency,timeoutInMilliseconds:90000,onProgress:({progress})=>update(12+Math.round((index+progress)/segments*78),`Renderizando tramo ${index+1}/${segments} · ${Math.round(progress*100)}%`)});
+          update(25+Math.round(index/segments*65),`Renderizando tramo ${index+1}/${segments}${attempt>1?' · segundo intento':''}`);
+          await renderMedia({...options,composition,inputProps:videoProps,codec:'h264',...quality,outputLocation:temporary,overwrite:true,muted:true,frameRange:[from,to],concurrency:renderConcurrency,timeoutInMilliseconds:90000,onProgress:({progress})=>update(25+Math.round((index+progress)/segments*65),`Renderizando tramo ${index+1}/${segments} · ${Math.round(progress*100)}%`)});
           if(!await validVideo(temporary,count))throw Error(`El tramo ${index+1} quedó incompleto`);
           renameSync(temporary,file);
           break;

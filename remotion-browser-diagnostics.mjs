@@ -1,5 +1,9 @@
 export function browserLaunchError(error,platform=process.platform){
   const detail=String(error?.message||error);
+  if(/socket hang up|ECONNRESET/i.test(detail)){
+    if(platform==='darwin')return 'Chrome perdió la conexión durante la exportación. Si abriste Clip Studio dentro de una sesión restringida, ciérralo y abre «Iniciar Clip Studio.command» desde Finder. Si vuelve a ocurrir, ejecuta «npm run check:browser» en Terminal. El proyecto y sus medios siguen guardados.';
+    return 'Chrome perdió la conexión durante la exportación. Ejecuta «npm run check:browser» en el servidor para diagnosticar su inicio y revisa la memoria disponible. El proyecto y sus medios siguen guardados.';
+  }
   if(!/Failed to launch the browser process|mach_port_rendezvous|BootstrapLookupMessage|Permission denied \(1100\)/i.test(detail))return null;
   if(platform==='darwin'&&/mach_port_rendezvous|BootstrapLookupMessage|Permission denied \(1100\)/i.test(detail)){
     return 'Remotion no pudo iniciar Chrome desde esta sesión restringida de macOS. Abre «Iniciar Clip Studio.command» desde Finder y vuelve a exportar. El proyecto y sus medios siguen guardados.';
