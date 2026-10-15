@@ -13,7 +13,7 @@ import {createTextLayer,templateStylePatch,textFieldValue,subtitleFieldValue} fr
 import {sceneFieldEdit,effectOverrideEdit,transitionOverrideEdit,transitionDurationEdit,inheritTransitionEdit,sceneSfxEdit,audioSelectionEdit,musicVolumeEdit,captionSettingEdit,multiEffectEdit,multiHideSubtitlesEdit,multiDeleteTextEdit,overlayEdit,toggleSequenceEdit,settingEdit,moveTextEdit,trimBoundaryEdit,trimCueEdit} from '/editor-edit-model.mjs';
 import {refreshChapterMapping,buildStoryboard,assignInitialAssets} from '/storyboard-model.mjs';
 import {ensureEditorSettings,migrateLegacySources,sourceCount} from '/project-model.mjs';
-import {renderGlobalSettings,renderFormatSettings,renderPreviewTransport,renderExportPage,patchExportProgress,renderRenamePanel,mountSidebarTools,renderTranscriptPanel,renderProjectPanel,renderProjectOptions,renderAssetLibrary,renderAssetTarget,renderChapterGroups,renderAutofillPanel,patchAutofillProgress,renderYoutubeSources,renderMissingSummary,renderStoryboard,renderStockCards,renderMediaPagination,renderSceneInspector,renderSceneExtras,renderTemplatePanel,renderEditorMediaPicker,renderNarrationPanel,renderStoryboardSettings,mountEditorButtons,mountEditorInspector,renderEditorTimeline,renderEditorHistory,renderEditorInspector,renderInspectorSelection,mountMediaPage,getMediaSession,patchMediaSession,getEditorInteraction,patchEditorInteraction,selectEditorInteraction,restoreEditorSelection,mountStudioShell,navigateStudioView,showProjectIndicator,showGlobalNotice,showEditorTitle,showEditorDirty,patchPreviewSurface,patchBusyView,filesFromDrop} from '/studio-ui.js';
+import {renderGlobalSettings,renderFormatSettings,renderPreviewTransport,renderExportPage,patchExportProgress,renderRenamePanel,mountSidebarTools,renderTranscriptPanel,renderProjectPanel,renderProjectOptions,renderAssetLibrary,renderAssetTarget,renderChapterGroups,renderAutofillPanel,patchAutofillProgress,renderYoutubeSources,renderMissingSummary,renderStoryboard,renderStockCards,renderMediaPagination,renderSceneInspector,renderSceneExtras,renderTemplatePanel,renderEditorMediaPicker,renderNarrationPanel,renderStoryboardSettings,mountEditorInspector,renderEditorTimeline,renderEditorHistory,renderEditorInspector,renderInspectorSelection,mountMediaPage,getMediaSession,patchMediaSession,getEditorInteraction,patchEditorInteraction,selectEditorInteraction,restoreEditorSelection,mountStudioShell,navigateStudioView,showProjectIndicator,showGlobalNotice,showEditorTitle,showEditorDirty,patchPreviewSurface,patchBusyView,filesFromDrop} from '/studio-ui.js';
 mountStudioShell(view=>{if(view==='export')renderExport();if(view==='editor'){updatePreview(true);requestAnimationFrame(sizePreviewStage);}},sizePreviewStage,()=>globalActions.save());
 await import('/remotion-player.js');
 mountMediaPage({file:(id,files)=>{void withError(async()=>receiveInput(id,files))();}});
@@ -108,7 +108,7 @@ function sizePreviewStage(){
   if(!p||!monitor||!document.getElementById('editor').classList.contains('active'))return;
   const ratio=p.settings?.ratio==='16:9'?16/9:9/16,style=getComputedStyle(monitor);
   const paddingX=parseFloat(style.paddingLeft)+parseFloat(style.paddingRight),paddingY=parseFloat(style.paddingTop)+parseFloat(style.paddingBottom);
-  const reserved=monitor.querySelector('.editor-monitor-head').offsetHeight+monitor.querySelector('.preview-controls').offsetHeight+monitor.querySelector('.monitor-actions').offsetHeight+paddingY+3*(parseFloat(style.gap)||0);
+  const reserved=monitor.querySelector('.editor-monitor-head').offsetHeight+monitor.querySelector('.preview-controls').offsetHeight+paddingY+2*(parseFloat(style.gap)||0);
   const availableWidth=Math.max(1,monitor.clientWidth-paddingX),availableHeight=Math.max(1,monitor.clientHeight-reserved);
   const width=Math.min(availableWidth,availableHeight*ratio);
   stage.style.aspectRatio=String(ratio);stage.style.width=`${Math.floor(width)}px`;stage.style.height=`${Math.floor(width/ratio)}px`;
@@ -427,10 +427,6 @@ const uiAction=handler=>event=>{try{Promise.resolve(handler(event)).catch(error=
 const historyActions={undo:()=>editorSession.undo(),redo:()=>editorSession.redo(),save:withError(async()=>{await editorSession.flush(true);notice('Edición guardada');})};
 window.addEventListener('keydown',e=>{if(!document.getElementById('editor').classList.contains('active'))return;if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='z'){e.preventDefault();(e.shiftKey?historyActions.redo:historyActions.undo)();}else if(e.code==='Space'&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||'')){e.preventDefault();previewActions.play();}else if(['ArrowLeft','ArrowRight'].includes(e.key)&&!/INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName||'')){e.preventDefault();seekExact(preview.time+(e.key==='ArrowRight'?1:-1)*(e.shiftKey?1:1/30));}});
 const addTextAction=()=>uiAction(()=>addText())();
-mountEditorButtons({
-  addText:addTextAction,
-  refresh:()=>withError(async()=>{requireProject();preview.invalidate();updatePreview(true);notice('Composición actualizada');})()
-});
 mountEditorInspector({scene:editorActions,sceneExtras:sceneExtraActions,inspector:inspectorActions,empty:{addText:addTextAction,addMusic:files=>inspectorActions.audioUpload('inspector-music-upload',files)}});
 const templateActions={
   create:id=>uiAction(()=>addText(id))(),

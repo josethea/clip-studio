@@ -9,7 +9,7 @@ import {AssetLibrary, AssetTarget, ChapterGrouping, AutofillControls, AutofillRe
 import {MediaPage} from './media-page.jsx';
 import {TimelineView,HistoryControls} from './editor.jsx';
 import {TemplatePanel,EditorMediaPicker} from './editor-extras.jsx';
-import {NarrationControls,EditorStoryboardControls,MediaStoryboardControls,TimelineToolbar,MonitorActions} from './editor-workflow.jsx';
+import {NarrationControls,EditorStoryboardControls,MediaStoryboardControls,TimelineToolbar} from './editor-workflow.jsx';
 import {EditorInspectorPanel} from './editor-inspector-panel.jsx';
 import {emptyEditorInteraction,selectEditorItem as deriveEditorSelection,restoreEditorInteraction as reconcileEditorSelection} from './editor-selection-model.mjs';
 import {GlobalControls,FormatControls,PreviewControls} from './editor-controls.jsx';
@@ -172,9 +172,6 @@ export function renderTemplatePanel(view,actions){renderMediaIsland('template-pa
 export function renderEditorMediaPicker(view,actions){
   store.dispatch(uiSlice.actions.showEditorMediaPicker(view));
   flushSync(()=>root('media-picker-app').render(<Provider store={store}><EditorMediaPicker actions={actions}/></Provider>));
-}
-export function mountEditorButtons(actions){
-  root('monitor-actions').render(<MonitorActions actions={actions}/>);
 }
 export function mountEditorInspector(actions){root('inspector-app').render(<Provider store={store}><EditorInspectorPanel actions={actions}/></Provider>);}
 export function renderInspectorSelection(view){store.dispatch(uiSlice.actions.showEditorSelection(view));}

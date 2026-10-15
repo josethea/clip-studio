@@ -25,6 +25,6 @@ test('narration, storyboard and timeline controls reflect the current project',a
     assert.match(editor,/value="smart" selected=""/);
     assert.match(media,/Uno por bloque SRT/);
     assert.match(timeline,/value="36"/);
-    assert.match(timeline,/36.0 px\/s/);
+    assert.doesNotMatch(timeline,/px\/s|Arrastra el cabezal/);
   }finally{await rm(temp,{recursive:true,force:true});}
 });

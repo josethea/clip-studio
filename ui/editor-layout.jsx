@@ -11,7 +11,7 @@ export function useEditorLayout(active,onPreviewResize){
     if(!active||!main?.clientWidth||matchMedia('(max-width:900px)').matches)return;
     const inspector=clamp(Number(layout.current.inspector)||265,180,Math.min(460,main.clientWidth-270));
     main.style.setProperty('--inspector-width',`${inspector}px`);
-    const top=clamp(Number(layout.current.top)||Math.round(main.clientHeight*.58),260,main.clientHeight-190);
+    const top=Math.max(260,Number(layout.current.top)||590);
     main.style.setProperty('--top-height',`${top}px`);
     requestAnimationFrame(onPreviewResize);
   },[active,onPreviewResize]);

@@ -117,7 +117,7 @@ export function TimelineView({actions}){
     else actions.trimCue(current.type,current.index,current.edge,atTime(event));
   };
   return <div ref={contentRef} className="timeline-content" style={{width:view.width}} onPointerDown={down} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish} onKeyDown={event=>{if(event.key!=='Enter'&&event.key!==' ')return;const item=event.target.closest('[data-select-type="transition"]');if(!item)return;event.preventDefault();actions.select('transition',Number(item.dataset.selectIndex),false);}}>
-    <div className="timeline-ruler"><RulerContent view={view} viewport={viewport}/></div>
+    <div className="timeline-ruler"><RulerContent view={view} viewport={viewport}/><span className="timeline-ruler-gutter" aria-hidden="true"/></div>
     {laneRows.map(([id,label])=><div className="timeline-track" key={id}><b>{label}</b><div className="timeline-lane" style={{width:view.laneWidth}}><LaneContent view={view} lane={id} viewport={viewport}/></div></div>)}
     <TimelinePlayhead/>
   </div>;

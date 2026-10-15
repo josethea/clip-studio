@@ -28,11 +28,7 @@ export function MediaStoryboardControls({actions}){return <StoryboardControls ac
 
 export function TimelineToolbar({actions}){
   const view=useSelector(state=>state.studioUi.editorTimeline);
-  return <><strong>LÍNEA DE TIEMPO</strong><label>Zoom <input type="range" min="2" max="120" value={view?.scale||8} onChange={event=>actions.zoom(Number(event.target.value))}/></label><span>{(view?.scale||8).toFixed(1)} px/s</span><span>Arrastra el cabezal para buscar. Mueve los textos o arrastra sus bordes para ajustar la duración.</span></>;
-}
-
-export function MonitorActions({actions}){
-  return <button className="secondary" onClick={actions.refresh}>Actualizar composición</button>;
+  return <><strong>LÍNEA DE TIEMPO</strong><label>Zoom <input type="range" min="2" max="120" value={view?.scale||8} onChange={event=>actions.zoom(Number(event.target.value))}/></label></>;
 }
 
 export function EmptyInspector({actions}){
