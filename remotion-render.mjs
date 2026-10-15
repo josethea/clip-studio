@@ -13,8 +13,8 @@ import {prepareRenderImages} from './render-image-preflight.mjs';
 import {browserLaunchError} from './remotion-browser-diagnostics.mjs';
 
 const ROOT=resolve(import.meta.dirname),execute=promisify(execFile),CHUNK_FRAMES=1800;
-const requestedConcurrency=Number.parseInt(process.env.CLIP_STUDIO_RENDER_CONCURRENCY||'2',10);
-const renderConcurrency=Number.isFinite(requestedConcurrency)?Math.max(1,Math.min(availableParallelism(),requestedConcurrency)):2;
+const requestedConcurrency=Number.parseInt(process.env.CLIP_STUDIO_RENDER_CONCURRENCY||'4',10);
+const renderConcurrency=Number.isFinite(requestedConcurrency)?Math.max(1,Math.min(availableParallelism(),requestedConcurrency)):4;
 let bundlePromise;
 
 async function probe(file,kind){
@@ -54,7 +54,7 @@ async function concatVideo(files,output){
 }
 
 export async function renderWithRemotion(project,folder,update){
-  const renderStarted=performance.now(),timings={unit:'ms',videoPreflightMs:0,imagePreflightMs:0,bundleMs:0,compositionMs:0,videoRenderingMs:0,videoConcatMs:0,audioRenderMs:0,finalMuxMs:0,validationMs:0,videoSegments:[]};
+  const renderStarted=performance.now(),timings={unit:'ms',concurrency:renderConcurrency,videoPreflightMs:0,imagePreflightMs:0,bundleMs:0,compositionMs:0,videoRenderingMs:0,videoConcatMs:0,audioRenderMs:0,finalMuxMs:0,validationMs:0,videoSegments:[]};
   const timed=async(key,action)=>{const start=performance.now();try{return await action();}finally{timings[key]=Math.round(performance.now()-start);}};
   if(!project.scenes?.length)throw Error('Crea el storyboard antes de exportar');
   const missing=project.scenes.filter(s=>!project.assets.some(a=>a.id===s.assetId));

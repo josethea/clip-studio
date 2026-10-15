@@ -57,7 +57,7 @@ La interfaz se migró por módulos. La composición de Remotion usa React y sigu
 - Comparar vista previa y MP4 en cortes/transiciones, textos, subtítulos, imagen y video.
 - Medir exportaciones de 5 y 30 minutos en el VPS antes de ajustar concurrencia de Remotion.
 
-El render usa dos procesos en paralelo por defecto. `CLIP_STUDIO_RENDER_CONCURRENCY=3` permite probar tres en el VPS; conviene comparar tiempo y memoria con el mismo proyecto antes de fijarlo. Este ajuste acelera el render cuando hay CPU disponible, pero no cambia la fluidez de la interfaz.
+El render solicita cuatro procesos en paralelo por defecto (limitados por los procesadores disponibles). `CLIP_STUDIO_RENDER_CONCURRENCY=2` permite volver a dos para comparar tiempo y memoria con el mismo proyecto. Este ajuste puede acelerar el render cuando hay CPU disponible, pero no cambia la fluidez de la interfaz. El JSON de tiempos de exportación registra la concurrencia efectiva.
 
 La interfaz React/Redux, la navegación, los divisores, la importación real de una imagen, un video y un SRT, la creación del storyboard y la asignación de medios se verificaron localmente con un proyecto temporal. El render corto llegó a Remotion, pero Chrome perdió su conexión en la sesión restringida de Codex para macOS; `npm run check:browser` reproduce esa restricción incluso sin proyecto. El progreso del empaquetado se limita ahora al 25% y el error indica cómo reintentar desde Finder o diagnosticarlo en Linux.
 
