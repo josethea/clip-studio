@@ -37,7 +37,7 @@ export function TimelineRuler(){const view=useSelector(state=>state.studioUi.edi
 function TimelineItem({item,scale}){
   if(item.boundary!=null)return <span className="scene-boundary" data-boundary={item.boundary} style={{left:item.start*scale}} title="Arrastra el corte entre tomas"/>;
   const selected=item.selected?' selected':'';
-  return <div className={`timeline-block ${item.kind}${selected}`} style={{left:item.start*scale,width:Math.max(item.selectType?2:1,(item.end-item.start)*scale)}} title={item.title||''} data-select-type={item.selectType} data-select-index={item.selectIndex}>
+  return <div className={`timeline-block ${item.kind}${selected}`} style={{left:item.start*scale,width:item.icon?28:Math.max(item.selectType?2:1,(item.end-item.start)*scale)}} title={item.title||''} aria-label={item.icon?item.title:undefined} role={item.icon?'button':undefined} tabIndex={item.icon?0:undefined} data-select-type={item.selectType} data-select-index={item.selectIndex}>
     {item.handles&&<><span className="trim-handle start" data-trim-edge="start" title="Arrastra para ajustar inicio"/><span className="trim-handle end" data-trim-edge="end" title="Arrastra para ajustar final"/></>}
     {item.selectType?<span className="timeline-label">{item.label}</span>:item.label}
   </div>;
@@ -46,7 +46,7 @@ function TimelineItem({item,scale}){
 function LaneContent({view,lane,viewport}){const items=view.lanes[lane]||[],visible=viewport?visibleTimelineItems(items,view.scale,viewport.left,viewport.width):items;return <>{visible.map(item=><TimelineItem key={item.key} item={item} scale={view.scale}/>)}</>;}
 export function TimelineLane({lane}){const view=useSelector(state=>state.studioUi.editorTimeline);return view?<LaneContent view={view} lane={lane}/>:null;}
 
-const laneRows=[['text-timeline','TEXTOS'],['timeline','VIDEO'],['effect-timeline','EFECTOS'],['transition-timeline','TRANS.'],['subtitle-timeline','SUBS'],['music-timeline','MÚSICA'],['sfx-timeline','SFX'],['audio-timeline','VOZ']];
+const laneRows=[['text-timeline','TEXTOS'],['timeline','VIDEO'],['subtitle-timeline','SUBS'],['music-timeline','MÚSICA'],['effect-timeline','EFECTOS'],['audio-timeline','VOZ']];
 function TimelinePlayhead(){
   const scale=useSelector(state=>state.studioUi.editorTimeline?.scale||1);
   const previewTime=useSelector(state=>state.studioUi.previewControls?.time||0);
@@ -102,7 +102,7 @@ export function TimelineView({actions}){
         const layer=view.lanes['text-timeline']?.[index];
         if(layer)drag.current={kind:'text',index,start:layer.start,end:layer.end,clientX:event.clientX,started:false};
       }
-    }else{drag.current={kind:'playhead',resume:actions.pauseForDrag()};actions.seek(atTime(event));}
+    }else actions.select('empty',0,false);
     if(drag.current)event.currentTarget.setPointerCapture(event.pointerId);
   };
   const move=event=>{
@@ -116,7 +116,7 @@ export function TimelineView({actions}){
     }else if(current.kind==='boundary')actions.trimBoundary(current.index,boundaryTime(atTime(event),current.min,current.max));
     else actions.trimCue(current.type,current.index,current.edge,atTime(event));
   };
-  return <div ref={contentRef} className="timeline-content" style={{width:view.width}} onPointerDown={down} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish}>
+  return <div ref={contentRef} className="timeline-content" style={{width:view.width}} onPointerDown={down} onPointerMove={move} onPointerUp={finish} onPointerCancel={finish} onKeyDown={event=>{if(event.key!=='Enter'&&event.key!==' ')return;const item=event.target.closest('[data-select-type="transition"]');if(!item)return;event.preventDefault();actions.select('transition',Number(item.dataset.selectIndex),false);}}>
     <div className="timeline-ruler"><RulerContent view={view} viewport={viewport}/></div>
     {laneRows.map(([id,label])=><div className="timeline-track" key={id}><b>{label}</b><div className="timeline-lane" style={{width:view.laneWidth}}><LaneContent view={view} lane={id} viewport={viewport}/></div></div>)}
     <TimelinePlayhead/>
@@ -143,11 +143,17 @@ export function EffectInspector({actions}){
 export function TransitionInspector({actions}){
   const view=useSelector(state=>state.studioUi.editorInspector);
   if(view?.type!=='transition')return null;
+  const changeSound=(key,event)=>actions.sfx(view.index,key,event.target.type==='number'?Number(event.target.value):event.target.value||null);
   return <><p className="studio-help">Tomas {view.index+1} → {view.index+2} · {time(view.cut)}</p>
-    <label>Tipo de transición<select value={view.transition} onChange={event=>actions.transition(view.index,event.target.value)}>{transitions.map(value=><option key={value} value={value}>{transitionLabels[value]||value}</option>)}</select></label>
+    <label>Tipo de transición<select value={view.transition} onChange={event=>actions.transition(view.index,event.target.value)}>{!transitions.includes(view.transition)&&<option value={view.transition}>{transitionLabels[view.transition]||view.transition} · anterior</option>}{transitions.map(value=><option key={value} value={value}>{transitionLabels[value]||value}</option>)}</select></label>
     <label>Duración de esta transición (s)<input key={`${view.index}:${view.duration}`} type="number" min="0" max="2" step="0.05" defaultValue={view.duration} onBlur={event=>{if(Number(event.target.value)!==Number(view.duration))actions.transitionDuration(view.index,Number(event.target.value));}}/></label>
     <p className="studio-help">Se omite si cualquiera de las tomas dura menos. Esta elección reemplaza la secuencia global solo en este corte.</p>
     <button className="secondary" onClick={()=>actions.transitionInherit(view.index)}>Usar secuencia global</button><button className="secondary" onClick={()=>actions.transitionPreview(view.index)}>▶ Ver transición</button>
+    <strong className="control-title">Sonido de esta transición</strong>
+    <label>Audio<select value={view.sfxId||''} onChange={event=>changeSound('sfxId',event)}><option value="">Sin sonido</option>{view.assets?.map(asset=><option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></label>
+    <label>Volumen (%)<input key={`${view.index}:volume:${view.volume}`} type="number" min="0" max="100" defaultValue={view.volume} onBlur={event=>{if(Number(event.target.value)!==Number(view.volume))changeSound('sfxVolume',event);}}/></label>
+    <label>Alineación<select value={view.align} onChange={event=>changeSound('sfxAlign',event)}><option value="start">Inicio</option><option value="center">Centro</option><option value="end">Final</option></select></label>
+    <label>Desfase (s)<input key={`${view.index}:offset:${view.offset}`} type="number" step=".05" defaultValue={view.offset} onBlur={event=>{if(Number(event.target.value)!==Number(view.offset))changeSound('sfxOffset',event);}}/></label>
   </>;
 }
 

@@ -10,7 +10,10 @@ test('timeline model keeps the cut, selected scene and transition centered',()=>
   assert.equal(view.lanes.timeline[0].label,'1 · Primera imagen');
   assert.equal(view.lanes.timeline[0].selected,true);
   assert.deepEqual(view.lanes.timeline[1],{key:'boundary-0',boundary:0,start:4});
-  assert.deepEqual([view.lanes['transition-timeline'][0].start,view.lanes['transition-timeline'][0].end],[3.5,4.5]);
+  assert.deepEqual([view.lanes.timeline[2].start,view.lanes.timeline[2].end],[4,4]);
+  assert.equal(view.lanes.timeline[2].selectType,'transition');
+  assert.equal(view.lanes.timeline[2].icon,true);
+  assert.deepEqual(view.lanes['effect-timeline'],[]);
   assert.equal(view.lanes['audio-timeline'][1].kind,'gap');
   assert.equal(view.lanes['text-timeline'][0].handles,true);
   assert.equal(view.ticks[0].left,64);

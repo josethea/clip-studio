@@ -31,7 +31,6 @@ export const GlobalControls=memo(function GlobalControls({actions}){
     <NumberField label="Opacidad oscura (%)" value={view.blurOpacity} min="0" max="80" onChange={value=>actions.change('blurOpacity',value)}/>
     <Select label="Movimiento de imagen" value={view.motion} options={motions} onChange={value=>actions.change('motion',value)}/>
     <NumberField label="Intensidad del movimiento (%)" value={view.zoomPercent} min="2" max="40" onChange={value=>actions.change('zoomPercent',value)}/>
-    <button className="secondary" onClick={actions.save}>Guardar estilo global</button>
   </>;
 });
 
@@ -50,10 +49,9 @@ export const FormatControls=memo(function FormatControls({actions}){
 export const PreviewControls=memo(function PreviewControls({actions}){
   const view=useSelector(state=>state.studioUi.previewControls);
   return <>
-    <button className="secondary" title="Desde inicio" onClick={actions.fromStart}>⏮</button>
-    <button id="preview-play" className="primary" onClick={actions.play}>{view?.playing?'Ⅱ Pausar':'▶ Reproducir'}</button>
-    <button className="secondary" title="Detener" onClick={actions.stop}>■</button>
-    <input type="range" min="0" max={view?.duration||1} step="0.01" value={view?.time||0} onChange={event=>actions.seek(event.target.value)} aria-label="Posición de reproducción"/>
+    <button className="secondary" title="Volver al inicio" aria-label="Volver al inicio" onClick={actions.fromStart}>⏮</button>
+    <button id="preview-play" className="secondary" title={view?.playing?'Pausar':'Reproducir'} aria-label={view?.playing?'Pausar':'Reproducir'} onClick={actions.play}>{view?.playing?'Ⅱ':'▶'}</button>
     <span>{formatTime(view?.time)} / {formatTime(view?.duration)}</span>
+    <button className="secondary preview-add-text" onClick={actions.addText}>＋ Texto</button>
   </>;
 });

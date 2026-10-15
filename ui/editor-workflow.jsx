@@ -32,9 +32,9 @@ export function TimelineToolbar({actions}){
 }
 
 export function MonitorActions({actions}){
-  return <><button className="secondary" onClick={actions.addText}>＋ Texto en el cabezal</button><button className="secondary" onClick={actions.refresh}>Actualizar composición</button></>;
+  return <button className="secondary" onClick={actions.refresh}>Actualizar composición</button>;
 }
 
 export function EmptyInspector({actions}){
-  return <><p className="studio-help">Selecciona una toma, efecto visual, transición, texto, subtítulo, voz, música o sonido en la línea de tiempo.</p><button className="secondary" onClick={actions.addText}>＋ Añadir texto</button></>;
+  return <><p className="studio-help">Selecciona una toma o transición para configurar sus propiedades. El cabezal conserva su posición al seleccionar.</p><button className="secondary" onClick={actions.addText}>＋ Añadir texto en el cabezal</button><label className="inspector-upload drop-zone">↥ Añadir música (subir audio)<input type="file" accept="audio/*" onChange={event=>{const files=[...event.target.files];event.target.value='';actions.addMusic(files);}}/></label></>;
 }

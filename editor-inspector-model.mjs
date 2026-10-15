@@ -20,7 +20,7 @@ export function buildInspectorView(project,{selection=null,multiSelection=[],tem
   }
   if(type==='transition'){
     const scene=project.scenes?.[index],next=project.scenes?.[index+1];
-    if(scene&&next){const resolved=effectiveScene(project,scene,index);panel={type,index,cut:scene.end,transition:resolved.transition,duration:resolved.transitionDuration};selected.time=time(scene.end);}
+    if(scene&&next){const resolved=effectiveScene(project,scene,index);panel={type,index,cut:scene.end,transition:resolved.transition,duration:resolved.transitionDuration,sfxId:scene.sfxId||null,volume:scene.sfxVolume??70,align:scene.sfxAlign||'center',offset:scene.sfxOffset||0,assets:(project.assets||[]).filter(asset=>asset.type==='audio').map(asset=>({id:asset.id,name:asset.name}))};selected.time=time(scene.end);}
   }
   if(type==='text'){
     const layer=project.textLayers?.[index];

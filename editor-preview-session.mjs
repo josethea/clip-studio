@@ -9,17 +9,16 @@ export function createPreviewSession({getProject,isEditorActive,player,prepare,o
     if(project.scenes.length&&isEditorActive()&&(force||!rendered)){
       const next=compositionSnapshot(project);
       if(next!==snapshot){
-        const composition=prepare(project,origin());
+        const composition={...prepare(project,origin()),preview:true};
         if(!rendered)player.mount(composition,frame(),false);
         else player.update(composition);
-        snapshot=next;rendered=true;onComposition();
+        snapshot=next;rendered=true;onComposition();onResize();
       }
     }
     time=Math.max(0,Math.min(duration(project),time));
     const scroll=getScroll(),cursor=64+time*(getScale()||1);
     if(scroll&&playing&&cursor>scroll.scrollLeft+scroll.clientWidth-50)scroll.scrollLeft=Math.max(0,cursor-scroll.clientWidth*.35);
     onTransport({time,duration:duration(project),playing});
-    onResize();
   }
 
   function seek(value){
@@ -42,9 +41,19 @@ export function createPreviewSession({getProject,isEditorActive,player,prepare,o
 
   function tick(){
     if(!playing||!rendered)return;
-    time=player.frame()/30;
+    const project=getProject();if(!project)return;
+    if(player.buffering?.())return;
+    const currentFrame=player.frame();
+    if(!Number.isFinite(currentFrame))return;
+    const nextTime=currentFrame/30;
+    // A media element can briefly detach and report frame zero while the next
+    // clip mounts. Only an explicit seek may move playback backwards.
+    if(nextTime+1/30<time&&time<duration(project)-1/30)return;
+    time=Math.max(0,Math.min(duration(project),nextTime));
     if(!player.playing())playing=false;
-    refresh();
+    const scroll=getScroll(),cursor=64+time*(getScale()||1);
+    if(scroll&&playing&&cursor>scroll.scrollLeft+scroll.clientWidth-50)scroll.scrollLeft=Math.max(0,cursor-scroll.clientWidth*.35);
+    onTransport({time,duration:duration(project),playing});
   }
 
   function reset(){

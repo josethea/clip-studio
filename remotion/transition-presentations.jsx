@@ -19,6 +19,10 @@ import {swap} from '@remotion/transitions/swap';
 import {blurSlide} from '@remotion/transitions/blur-slide';
 
 const cache=new Map();
+function FadeThroughBlack({children,presentationDirection,presentationProgress}){
+  const opacity=presentationDirection==='exiting'?Math.max(0,1-2*presentationProgress):Math.max(0,2*presentationProgress-1);
+  return <AbsoluteFill style={{opacity}}>{children}</AbsoluteFill>;
+}
 
 export function transitionPresentation(name,width,height){
   if(name==='remotion:none')return null;
@@ -28,6 +32,7 @@ export function transitionPresentation(name,width,height){
   let presentation;
   switch(kind){
     case 'fade':presentation=fade();break;
+    case 'fade-black':presentation={component:FadeThroughBlack,props:{}};break;
     case 'push-cut':presentation=pushCut();break;
     case 'slide':presentation=slide({direction:`from-${direction}`});break;
     case 'wipe':presentation=wipe({direction:`from-${direction}`});break;
@@ -51,3 +56,5 @@ export function transitionPresentation(name,width,height){
   cache.set(key,presentation);
   return presentation;
 }
+import React from 'react';
+import {AbsoluteFill} from 'remotion';

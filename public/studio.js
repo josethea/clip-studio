@@ -14,7 +14,7 @@ import {sceneFieldEdit,effectOverrideEdit,transitionOverrideEdit,transitionDurat
 import {refreshChapterMapping,buildStoryboard,assignInitialAssets} from '/storyboard-model.mjs';
 import {ensureEditorSettings,migrateLegacySources,sourceCount} from '/project-model.mjs';
 import {renderGlobalSettings,renderFormatSettings,renderPreviewTransport,renderExportPage,patchExportProgress,renderRenamePanel,mountSidebarTools,renderTranscriptPanel,renderProjectPanel,renderProjectOptions,renderAssetLibrary,renderAssetTarget,renderChapterGroups,renderAutofillPanel,patchAutofillProgress,renderYoutubeSources,renderMissingSummary,renderStoryboard,renderStockCards,renderMediaPagination,renderSceneInspector,renderSceneExtras,renderTemplatePanel,renderEditorMediaPicker,renderNarrationPanel,renderStoryboardSettings,mountEditorButtons,mountEditorInspector,renderEditorTimeline,renderEditorHistory,renderEditorInspector,renderInspectorSelection,mountMediaPage,getMediaSession,patchMediaSession,getEditorInteraction,patchEditorInteraction,selectEditorInteraction,restoreEditorSelection,mountStudioShell,navigateStudioView,showProjectIndicator,showGlobalNotice,showEditorTitle,showEditorDirty,patchPreviewSurface,patchBusyView,filesFromDrop} from '/studio-ui.js';
-mountStudioShell(view=>{if(view==='export')renderExport();if(view==='editor'){updatePreview(true);requestAnimationFrame(sizePreviewStage);}},sizePreviewStage);
+mountStudioShell(view=>{if(view==='export')renderExport();if(view==='editor'){updatePreview(true);requestAnimationFrame(sizePreviewStage);}},sizePreviewStage,()=>globalActions.save());
 await import('/remotion-player.js');
 mountMediaPage({file:(id,files)=>{void withError(async()=>receiveInput(id,files))();}});
 const $=id=>document.getElementById(id), state={project:null,rename:null,youtubeFormKey:0,pages:{assets:0,media:0,scenes:0},autofillStart:null,autofillRunning:false,autofillRunId:0,timelineScale:null,busy:false,segmentOverrideMode:false,mediaPickerOpenToken:0,pauseMs:300,spacingResult:null,assignMode:'basic'};
@@ -125,6 +125,7 @@ const preview=createPreviewSession({
   getScroll:()=>$('timeline-scroll'),
   onResize:sizePreviewStage
 });
+window.addEventListener('clip-studio-player-buffering',event=>patchPreviewSurface({status:event.detail.buffering?'Cargando el siguiente video…':'Vista previa lista'}));
 function updatePreview(refresh=false){preview.refresh(refresh);}
 function seekExact(time){preview.seek(time);}
 async function setPreviewPlaying(value){await preview.play(value);}
@@ -225,7 +226,7 @@ const inspectorActions={
   transitionDuration(index,value){if(interaction().selection?.type!=='transition'||interaction().selection.index!==index||!applyEditorEdit(transitionDurationEdit(state.project,index,value)))return;renderTimeline();renderInspector();updatePreview(true);markEditorDirty();},
   transitionInherit(index){if(interaction().selection?.type!=='transition'||interaction().selection.index!==index||!applyEditorEdit(inheritTransitionEdit(state.project,index)))return;renderScenes();updatePreview(true);markEditorDirty();},
   transitionPreview(index){return withError(async()=>{const s=state.project?.scenes[index];if(!s||interaction().selection?.type!=='transition'||interaction().selection.index!==index)return;await setPreviewPlaying(false);seekExact(Math.max(0,s.end-Math.max(.4,Number(s.transitionDurationOverride??state.project.settings?.transitionDuration??.45))));await setPreviewPlaying(true);})();},
-  sfx(index,key,value){if(interaction().selection?.type!=='sfx'||interaction().selection.index!==index||!applyEditorEdit(sceneSfxEdit(state.project,index,key,value)))return;renderTimeline();renderInspector();updatePreview(true);markEditorDirty();},
+  sfx(index,key,value){if(!['sfx','transition'].includes(interaction().selection?.type)||interaction().selection.index!==index||!applyEditorEdit(sceneSfxEdit(state.project,index,key,value)))return;renderTimeline();renderInspector();updatePreview(true);markEditorDirty();},
   audioSelect(key,value){if(!applyEditorEdit(audioSelectionEdit(state.project,key,value)))return;renderScenes();updatePreview(true);markEditorDirty();},
   musicVolume(value){if(!applyEditorEdit(musicVolumeEdit(state.project,value)))return;renderScenes();updatePreview(true);markEditorDirty();},
   audioUpload(id,files){return withError(async()=>receiveInput(id,files))();},
@@ -343,7 +344,7 @@ const sceneExtraActions={
   saveScene:withError(async()=>{if(interaction().selectedScene==null)throw Error('Selecciona un segmento');await saveProject();notice(`Cambios del segmento ${interaction().selectedScene+1} guardados`);})
 };
 function toggleTransition(value){if(!applyEditorEdit(toggleSequenceEdit(state.project,'transitionSequence',value,transitions)))return;renderGlobalControls();renderTimeline();updatePreview(true);markEditorDirty();}
-const globalActions={toggleTransition,toggleEffect(value){if(!applyEditorEdit(toggleSequenceEdit(state.project,'effectSequence',value,videoEffects)))return;renderGlobalControls();renderTimeline();updatePreview(true);markEditorDirty();},change(key,value){if(!applyEditorEdit(settingEdit(state.project,key,value,['transitionDuration','imageFit','videoFit','blur','blurOpacity','motion','zoomPercent'])))return;renderGlobalControls();renderTimeline();updatePreview(true);markEditorDirty();},save:withError(async()=>{await saveProject();notice('Estilo global guardado');})};
+const globalActions={toggleTransition,toggleEffect(value){if(!applyEditorEdit(toggleSequenceEdit(state.project,'effectSequence',value,videoEffects)))return;renderGlobalControls();renderTimeline();updatePreview(true);markEditorDirty();},change(key,value){if(!applyEditorEdit(settingEdit(state.project,key,value,['transitionDuration','imageFit','videoFit','blur','blurOpacity','motion','zoomPercent'])))return;renderGlobalControls();renderTimeline();updatePreview(true);markEditorDirty();},save:withError(async()=>{await saveProject();$('editor-global-dialog').close();notice('Ajustes globales guardados');})};
 const formatActions={change(key,value){if(!applyEditorEdit(settingEdit(state.project,key,value,['ratio','quality','exportQuality','captions'])))return;renderFormatSettings({ratio:state.project.settings.ratio||'9:16',quality:state.project.settings.quality||'720p',exportQuality:state.project.settings.exportQuality||'high',captions:state.project.settings.captions!==false},formatActions);if(key==='exportQuality')renderExport();else {renderScenes();updatePreview(true);}markEditorDirty();}};
 const timelineActions={
   select:selectTimeline,seek:seekExact,
@@ -357,7 +358,7 @@ const timelineActions={
   trimCue(type,index,edge,time){const edit=trimCueEdit(state.project,type,index,edge,time);if(!edit)return;edit();renderTimeline();updatePreview(true);markEditorDirty();},
   finishEdit(){renderScenes();markEditorDirty();}
 };
-const previewActions={play:withError(async()=>{requireProject();await setPreviewPlaying(!preview.playing);}),stop:withError(async()=>{requireProject();await setPreviewPlaying(false);seekExact(0);}),fromStart:withError(async()=>{requireProject();await setPreviewPlaying(false);seekExact(0);await setPreviewPlaying(true);}),seek:seekExact};
+const previewActions={play:withError(async()=>{requireProject();await setPreviewPlaying(!preview.playing);}),stop:withError(async()=>{requireProject();await setPreviewPlaying(false);seekExact(0);}),fromStart:withError(async()=>{requireProject();await setPreviewPlaying(false);seekExact(0);}),seek:seekExact,addText:()=>addTextAction()};
 renderPreviewTransport({time:0,duration:0,playing:false},previewActions);
 const exportActions={
   startMp4:withError(async()=>{const p=requireProject(),clickedAt=performance.now();patchExportProgress({running:true,mp4:'Preparando exportación…'});try{await saveProject();const t=await api(`/projects/${p.id}/render`,jsonOptions({requestElapsedMs:Math.round(performance.now()-clickedAt)}));await followTask(t,message=>patchExportProgress({mp4:message}));patchExportProgress({running:false,mp4:''});renderExport();notice('Exportación terminada');}catch(error){patchExportProgress({running:false,mp4:`Error: ${error.message}`});throw error;}}),
@@ -430,7 +431,7 @@ mountEditorButtons({
   addText:addTextAction,
   refresh:()=>withError(async()=>{requireProject();preview.invalidate();updatePreview(true);notice('Composición actualizada');})()
 });
-mountEditorInspector({scene:editorActions,sceneExtras:sceneExtraActions,inspector:inspectorActions,empty:{addText:addTextAction}});
+mountEditorInspector({scene:editorActions,sceneExtras:sceneExtraActions,inspector:inspectorActions,empty:{addText:addTextAction,addMusic:files=>inspectorActions.audioUpload('inspector-music-upload',files)}});
 const templateActions={
   create:id=>uiAction(()=>addText(id))(),
   remove:id=>uiAction(async()=>persistTemplates(customTemplates().filter(t=>t.id!==id)))(),

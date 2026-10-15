@@ -3,9 +3,9 @@ import assert from 'node:assert/strict';
 import {legacyTransitions,transitions,normalizeTransition,migrateProjectTransitions,effectiveScene,transitionSeconds} from './studio-core.mjs';
 
 test('only Remotion transitions appear in the editor picker',()=>{
-  assert.ok(transitions.every(name=>name.startsWith('remotion:')));
+  assert.deepEqual(transitions,['remotion:none','remotion:fade','remotion:slide:right','remotion:slide:left','remotion:wipe:left','remotion:fade-black']);
   assert.ok(legacyTransitions.every(name=>!transitions.includes(name)));
-  assert.equal(transitions[0],'remotion:none');
+  assert.equal(normalizeTransition('remotion:fade-black'),'remotion:fade-black');
 });
 
 test('old transition names migrate to safe Remotion choices',()=>{

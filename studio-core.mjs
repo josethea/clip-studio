@@ -10,12 +10,15 @@ export const remotionTransitionOptions = [
   ['remotion:zoom-in-out','Zoom In Out'],['remotion:dissolve','Dissolve'],['remotion:ripple','Ripple'],['remotion:crosswarp','Crosswarp'],['remotion:cross-zoom','Cross Zoom'],['remotion:swap','Swap'],
   ['remotion:blur-slide:left','Blur Slide desde izquierda'],['remotion:blur-slide:right','Blur Slide desde derecha'],['remotion:blur-slide:top','Blur Slide desde arriba'],['remotion:blur-slide:bottom','Blur Slide desde abajo']
 ];
-export const transitionLabels={ 'remotion:none':'Sin transición', ...Object.fromEntries(remotionTransitionOptions)};
-export const transitions=['remotion:none',...remotionTransitionOptions.map(([id])=>id)];
+export const transitionLabels={ 'remotion:none':'Corte', ...Object.fromEntries(remotionTransitionOptions),
+  'remotion:fade':'Fundido','remotion:slide:right':'Deslizar a la izquierda','remotion:slide:left':'Deslizar a la derecha',
+  'remotion:wipe:left':'Cortinilla','remotion:fade-black':'Fundido a negro'};
+export const transitions=['remotion:none','remotion:fade','remotion:slide:right','remotion:slide:left','remotion:wipe:left','remotion:fade-black'];
+const supportedTransitions=new Set(['remotion:none','remotion:fade-black',...remotionTransitionOptions.map(([id])=>id)]);
 // Projects saved before the Remotion transition picker used these names. Keep
 // them readable, but never send the old effects back into a render.
 export function normalizeTransition(value){
-  if(transitions.includes(value))return value;
+  if(supportedTransitions.has(value))return value;
   if(value==='Corte')return 'remotion:none';
   return legacyTransitions.includes(value)?'remotion:slide:bottom':'remotion:none';
 }

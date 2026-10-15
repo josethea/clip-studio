@@ -77,9 +77,9 @@ function root(id){
 }
 
 let onShellNavigate=()=>{};
-export function mountStudioShell(onNavigate,onPreviewResize){
+export function mountStudioShell(onNavigate,onPreviewResize,onGlobalSave){
   onShellNavigate=onNavigate;
-  flushSync(()=>root('app-root').render(<Provider store={store}><StudioShell onNavigate={navigateStudioView} onSidebar={id=>store.dispatch(uiSlice.actions.setActiveSidebar(id))} onToggleSidebar={()=>store.dispatch(uiSlice.actions.toggleSidebar())} onPreviewResize={onPreviewResize}/></Provider>));
+  flushSync(()=>root('app-root').render(<Provider store={store}><StudioShell onNavigate={navigateStudioView} onSidebar={id=>store.dispatch(uiSlice.actions.setActiveSidebar(id))} onToggleSidebar={()=>store.dispatch(uiSlice.actions.toggleSidebar())} onPreviewResize={onPreviewResize} onGlobalSave={onGlobalSave}/></Provider>));
 }
 export function navigateStudioView(view){
   if(!['project','transcript','assets','editor','export'].includes(view))return;

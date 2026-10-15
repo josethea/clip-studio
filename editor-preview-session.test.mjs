@@ -6,7 +6,7 @@ const project=()=>({id:'one',scenes:[{start:0,end:10}],assets:[],cues:[],subtitl
 
 test('preview session mounts once, updates changed compositions, and keeps playback time independent',async()=>{
   const p=project(),calls=[],transport=[];
-  const player={mount:(...args)=>calls.push(['mount',...args]),update:value=>calls.push(['update',value]),seek:value=>calls.push(['seek',value]),play:()=>calls.push(['play']),pause:()=>calls.push(['pause']),unmount:()=>calls.push(['unmount']),ready:()=>true,frame:()=>60,playing:()=>true};
+  const player={mount:(...args)=>calls.push(['mount',...args]),update:value=>calls.push(['update',value]),seek:value=>calls.push(['seek',value]),play:()=>calls.push(['play']),pause:()=>calls.push(['pause']),unmount:()=>calls.push(['unmount']),ready:()=>true,frame:()=>150,playing:()=>true};
   const preview=createPreviewSession({getProject:()=>p,isEditorActive:()=>true,player,prepare:value=>({id:value.id,scene:value.scenes[0].end}),origin:()=>'',onTransport:view=>transport.push(view)});
   preview.refresh(true);
   preview.seek(4);
@@ -15,8 +15,8 @@ test('preview session mounts once, updates changed compositions, and keeps playb
   await preview.play(true);
   assert.equal(preview.playing,true);
   preview.tick();
-  assert.equal(preview.time,2);
-  assert.equal(transport.at(-1).time,2);
+  assert.equal(preview.time,5);
+  assert.equal(transport.at(-1).time,5);
   p.scenes[0].end=12;
   preview.refresh(true);
   assert.equal(calls.filter(call=>call[0]==='update').length,1);
@@ -24,6 +24,22 @@ test('preview session mounts once, updates changed compositions, and keeps playb
   assert.equal(preview.time,0);
   assert.equal(preview.playing,false);
   assert.equal(calls.at(-1)[0],'unmount');
+});
+
+test('a buffering or temporarily detached video cannot jump the transport to zero',async()=>{
+  const p=project();let loading=false,currentFrame=120,playing=true;
+  const player={mount:()=>{},update:()=>{},seek:()=>{},play:()=>{},pause:()=>{},unmount:()=>{},ready:()=>true,frame:()=>currentFrame,playing:()=>playing,buffering:()=>loading};
+  const preview=createPreviewSession({getProject:()=>p,isEditorActive:()=>true,player,prepare:()=>({}),origin:()=>''});
+  preview.refresh(true);
+  preview.seek(4);
+  await preview.play(true);
+  loading=true;playing=false;currentFrame=0;preview.tick();
+  assert.equal(preview.time,4);
+  assert.equal(preview.playing,true);
+  loading=false;currentFrame=null;preview.tick();
+  assert.equal(preview.time,4);
+  currentFrame=135;playing=true;preview.tick();
+  assert.equal(preview.time,4.5);
 });
 
 test('reset cancels a pending play before it reaches the old project',async()=>{
