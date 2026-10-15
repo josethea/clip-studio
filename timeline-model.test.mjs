@@ -26,3 +26,14 @@ test('timeline model keeps empty lanes and derives scale for an empty storyboard
   assert.deepEqual(view.lanes.timeline,[]);
   assert.deepEqual(view.lanes['music-timeline'],[]);
 });
+
+test('disabled subtitles disappear from the timeline model',()=>{
+  const project={settings:{captions:false},assets:[],scenes:[],cues:[{start:0,end:2,text:'Voz'}],subtitleCues:[{start:0,end:2,text:'Texto'}],textLayers:[]};
+  const hidden=buildTimelineView(project);
+  assert.equal(hidden.showSubtitles,false);
+  assert.deepEqual(hidden.lanes['subtitle-timeline'],[]);
+  project.settings.captions=true;
+  const visible=buildTimelineView(project);
+  assert.equal(visible.showSubtitles,true);
+  assert.equal(visible.lanes['subtitle-timeline'][0].label,'Texto');
+});

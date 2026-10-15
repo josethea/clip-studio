@@ -10,7 +10,7 @@ import {Provider} from 'react-redux';
 import {configureStore} from '@reduxjs/toolkit';
 import {exportView} from '../export-view.mjs';
 
-const project=()=>({id:'p1',title:'Prueba',cues:[{start:0,end:4}],scenes:[{start:0,end:4,assetId:'image'}],assets:[{id:'image',name:'Imagen',type:'image',width:1376,height:768}],settings:{ratio:'16:9',quality:'1080p',exportQuality:'high'},exports:[{name:'video.mp4',duration:4,width:1920,height:1080,renderDurationMs:123000}]});
+const project=()=>({id:'p1',title:'Prueba',cues:[{start:0,end:4}],scenes:[{start:0,end:4,assetId:'image'}],assets:[{id:'image',name:'Imagen',type:'image',width:1376,height:768}],settings:{ratio:'16:9',quality:'1080p',exportQuality:'high'},exports:[{name:'video.mp4',duration:4,width:1920,height:1080,renderDurationMs:123000,timings:{unit:'ms',renderMs:122000,totalMs:123000}}]});
 
 test('export validation reports missing assets, resolution and completed video',()=>{
   const valid=exportView(project());
@@ -31,6 +31,7 @@ test('React export page shows progress, downloads and a disabled invalid render'
     const ready=render(exportView(project()),{mp4:'',running:false,capcut:'',capcutRunning:false,capcutResult:null});
     assert.match(ready,/Tiempo total de exportación: <strong>00:02:03<\/strong>/);
     assert.match(ready,/download="Prueba.mp4"/);
+    assert.match(ready,/Ver detalle/);
     const running=render(exportView(project()),{mp4:'50% · Renderizando',running:true,capcut:'',capcutRunning:false,capcutResult:null});
     assert.match(running,/50% · Renderizando/);
     assert.doesNotMatch(running,/Video listo · Tiempo total/);

@@ -32,5 +32,6 @@ export function TimelineToolbar({actions}){
 }
 
 export function EmptyInspector({actions}){
-  return <><p className="studio-help">Selecciona una toma o transición para configurar sus propiedades. El cabezal conserva su posición al seleccionar.</p><button className="secondary" onClick={actions.addText}>＋ Añadir texto en el cabezal</button><label className="inspector-upload drop-zone">↥ Añadir música (subir audio)<input type="file" accept="audio/*" onChange={event=>{const files=[...event.target.files];event.target.value='';actions.addMusic(files);}}/></label></>;
+  const view=useSelector(state=>state.studioUi.editorInspector);
+  return <><p className="studio-help">Selecciona una toma o transición para configurar sus propiedades. El cabezal conserva su posición al seleccionar.</p><button className="secondary" onClick={actions.addText}>＋ Añadir texto en el cabezal</button><label>Añadir música desde Medios<select value={view?.musicId||''} onChange={event=>actions.selectMusic(event.target.value)}><option value="">Sin música</option>{view?.assets?.map(asset=><option key={asset.id} value={asset.id}>{asset.name}</option>)}</select></label><label className="inspector-upload drop-zone">↥ Subir otro audio<input type="file" accept="audio/*" onChange={event=>{const files=[...event.target.files];event.target.value='';actions.addMusic(files);}}/></label></>;
 }

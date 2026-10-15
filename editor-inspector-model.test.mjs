@@ -14,6 +14,7 @@ const view=(type,index=0,options={})=>buildInspectorView(project,{selection:{typ
 test('inspector model derives each selection without changing the project',()=>{
   const original=JSON.stringify(project);
   assert.deepEqual(buildInspectorView(null),{selection:{type:'empty',heading:'PROPIEDADES',time:''},panel:null});
+  assert.deepEqual(view('empty').panel,{type:'empty',musicId:null,assets:[{id:'sound',name:'Sonido'}]});
   assert.equal(view('scene').selection.time,'00:00.000–00:03.000');
   const effect=view('effect');
   assert.equal(effect.panel.override,'warm');

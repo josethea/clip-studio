@@ -24,6 +24,11 @@ test('global and preview controls reflect project settings and playback state',a
     assert.match(format,/value="1080p" selected=""/);
     assert.match(format,/value="maximum" selected=""/);
     assert.match(format,/value="no" selected=""/);
+    assert.doesNotMatch(format,/Archivo SRT para subtítulos/);
+    const activeStore=configureStore({reducer:()=>({studioUi:{formatControls:{ratio:'16:9',quality:'1080p',exportQuality:'high',captions:true,subtitleSource:'generated',subtitleOptions:[{id:'original',label:'SRT original'},{id:'generated',label:'SRT generado'}]}}})});
+    const activeFormat=renderToStaticMarkup(React.createElement(Provider,{store:activeStore},React.createElement(FormatControls,{actions:{}})));
+    assert.match(activeFormat,/Archivo SRT para subtítulos/);
+    assert.match(activeFormat,/value="generated" selected=""/);
     assert.match(preview,/aria-label="Pausar">Ⅱ/);
     assert.match(preview,/＋ Texto/);
     assert.match(preview,/00:03.500 \/ 00:10.000/);

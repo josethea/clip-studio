@@ -13,8 +13,8 @@ test('narration, storyboard and timeline controls reflect the current project',a
   const projectRoot=resolve(import.meta.dirname,'..'),temp=await mkdtemp(join(projectRoot,'node_modules','.editor-workflow-test-'));
   try{
     await build({entryPoints:[join(projectRoot,'ui','editor-workflow.jsx')],bundle:true,packages:'external',platform:'node',format:'esm',jsx:'automatic',outfile:join(temp,'workflow.mjs')});
-    const {NarrationControls,EditorStoryboardControls,MediaStoryboardControls,TimelineToolbar}=await import(pathToFileURL(join(temp,'workflow.mjs')).href);
-    const store=configureStore({reducer:()=>({studioUi:{editorNarration:{projectId:'project',pauseMs:450,gapCount:8,longGaps:3,duration:'01:35.000',scenes:12,subtitles:16,result:{cuts:3,removed:1.25,audioId:'audio-1',srt:'captions.srt'}},editorStoryboard:{projectId:'project',sceneMode:'chapter',assignMode:'smart'},editorTimeline:{scale:36}}})});
+    const {NarrationControls,EditorStoryboardControls,MediaStoryboardControls,TimelineToolbar,EmptyInspector}=await import(pathToFileURL(join(temp,'workflow.mjs')).href);
+    const store=configureStore({reducer:()=>({studioUi:{editorNarration:{projectId:'project',pauseMs:450,gapCount:8,longGaps:3,duration:'01:35.000',scenes:12,subtitles:16,result:{cuts:3,removed:1.25,audioId:'audio-1',srt:'captions.srt'}},editorStoryboard:{projectId:'project',sceneMode:'chapter',assignMode:'smart'},editorTimeline:{scale:36},editorInspector:{type:'empty',musicId:'audio-1',assets:[{id:'audio-1',name:'Música subida.mp3'}]}}})});
     const render=Component=>renderToStaticMarkup(React.createElement(Provider,{store},React.createElement(Component,{actions:{}})));
     const narration=render(NarrationControls),editor=render(EditorStoryboardControls),media=render(MediaStoryboardControls),timeline=render(TimelineToolbar);
     assert.match(narration,/value="450"/);
@@ -26,5 +26,8 @@ test('narration, storyboard and timeline controls reflect the current project',a
     assert.match(media,/Uno por bloque SRT/);
     assert.match(timeline,/value="36"/);
     assert.doesNotMatch(timeline,/px\/s|Arrastra el cabezal/);
+    const empty=render(EmptyInspector);
+    assert.match(empty,/Añadir música desde Medios/);
+    assert.match(empty,/Música subida.mp3/);
   }finally{await rm(temp,{recursive:true,force:true});}
 });

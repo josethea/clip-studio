@@ -21,9 +21,9 @@ export function buildTimelineView(project,{scale,selection=null,multiSelection=[
     'effect-timeline':[],
     'audio-timeline':(p.cues||[]).flatMap((cue,i)=>[item(`voice-${i}`,'voice',cue.start,cue.end,`▥ ${i+1}`,'voice',i,false,cue.text),...(i<p.cues.length-1&&p.cues[i+1].start>cue.end?[item(`gap-${i}`,'gap',cue.end,p.cues[i+1].start,`${Math.round((p.cues[i+1].start-cue.end)*1000)} ms`,null,null,false,'Pausa')]:[])]),
     'music-timeline':[],
-    'subtitle-timeline':(p.subtitleCues?.length?p.subtitleCues:p.cues||[]).map((cue,i)=>item(`subtitle-${i}`,`subtitle${cue.hidden?' muted':''}`,cue.start,cue.end,cue.text,'subtitle',i,true,cue.text))
+    'subtitle-timeline':p.settings?.captions===false?[]:(p.subtitleCues?.length?p.subtitleCues:p.cues||[]).map((cue,i)=>item(`subtitle-${i}`,`subtitle${cue.hidden?' muted':''}`,cue.start,cue.end,cue.text,'subtitle',i,true,cue.text))
   };
   const music=assets.get(p.musicId);
   if(end&&music)lanes['music-timeline']=[item('music','music',0,end,`♫ ${music.name} · ${p.settings?.musicVolume??20}%`,'music',0,false,music.name)];
-  return {scale:pixels,width:64+laneWidth,laneWidth,duration:end,lanes,ticks:Array.from({length:Math.floor(end/tickSeconds)+1},(_,i)=>({time:i*tickSeconds,left:64+i*tickSeconds*pixels}))};
+  return {scale:pixels,width:64+laneWidth,laneWidth,duration:end,showSubtitles:p.settings?.captions!==false,lanes,ticks:Array.from({length:Math.floor(end/tickSeconds)+1},(_,i)=>({time:i*tickSeconds,left:64+i*tickSeconds*pixels}))};
 }

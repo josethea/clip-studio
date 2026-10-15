@@ -11,6 +11,7 @@ export function buildInspectorView(project,{selection=null,multiSelection=[],tem
   const selected={type,heading:names[type]||'PROPIEDADES',time:''};
   if(!project)return {selection:{type:'empty',heading:'PROPIEDADES',time:''},panel:null};
   let panel=null;
+  if(type==='empty')panel={type,musicId:project.musicId||null,assets:(project.assets||[]).filter(asset=>asset.type==='audio').map(asset=>({id:asset.id,name:asset.name}))};
   if(type==='multi')panel={type,count:multiSelection.length,hasScenes:multiSelection.some(item=>item.type==='scene'),hasSubtitles:multiSelection.some(item=>item.type==='subtitle'),hasText:multiSelection.some(item=>item.type==='text')};
   if(type==='scene'){
     const scene=project.scenes?.[index];if(scene)selected.time=range(scene);

@@ -43,6 +43,7 @@ export const FormatControls=memo(function FormatControls({actions}){
     <Select label="Calidad del MP4" value={view.exportQuality} options={[["balanced","Equilibrada · exporta más rápido"],["high","Alta · recomendada"],["maximum","Máxima · archivo grande"]]} onChange={value=>actions.change('exportQuality',value)}/>
     <p className="studio-help">1080p define el tamaño del video; la nitidez también depende de la resolución de las imágenes originales.</p>
     <Select label="Subtítulos" value={view.captions?'yes':'no'} options={[["yes","Activados"],["no","Desactivados"]]} onChange={value=>actions.change('captions',value==='yes')}/>
+    {view.captions&&<Select label="Archivo SRT para subtítulos" value={view.subtitleSource||''} options={(view.subtitleOptions||[]).map(option=>[option.id,option.label])} onChange={actions.subtitleSource}/>}
   </>;
 });
 

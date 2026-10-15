@@ -54,18 +54,20 @@ async function concatVideo(files,output){
 }
 
 export async function renderWithRemotion(project,folder,update){
+  const renderStarted=performance.now(),timings={unit:'ms',videoPreflightMs:0,imagePreflightMs:0,bundleMs:0,compositionMs:0,videoRenderingMs:0,videoConcatMs:0,audioRenderMs:0,finalMuxMs:0,validationMs:0,videoSegments:[]};
+  const timed=async(key,action)=>{const start=performance.now();try{return await action();}finally{timings[key]=Math.round(performance.now()-start);}};
   if(!project.scenes?.length)throw Error('Crea el storyboard antes de exportar');
   const missing=project.scenes.filter(s=>!project.assets.some(a=>a.id===s.assetId));
   if(missing.length)throw Error(`Faltan medios en ${missing.length} escenas`);
   const port=Number(process.env.PORT||4173),prepared=prepareRemotionProject(project,`http://127.0.0.1:${port}`);
   const work=join(folder,'renders');mkdirSync(work,{recursive:true});
   update(1,'Verificando compatibilidad de los videos');
-  await preparePlayableVideoAssets(project,folder,prepared,update);
+  await timed('videoPreflightMs',()=>preparePlayableVideoAssets(project,folder,prepared,update));
   update(9,'Preparando imágenes para exportar');
-  await prepareRenderImages(project,folder,prepared,update);
+  await timed('imagePreflightMs',()=>prepareRenderImages(project,folder,prepared,update));
   update(11,'Preparando la composición');
   bundlePromise??=bundle({entryPoint:join(ROOT,'remotion/root.jsx'),outDir:join(ROOT,'.remotion-bundle'),onProgress:p=>update(11+Math.round(Math.max(0,Math.min(100,p))*.14),`Preparando motor de video · ${Math.round(p)}%`)}).catch(e=>{bundlePromise=null;throw e;});
-  const serveUrl=await bundlePromise,options={serveUrl};
+  const serveUrl=await timed('bundleMs',()=>bundlePromise),options={serveUrl};
   if(process.env.CLIP_STUDIO_CHROME)options.browserExecutable=process.env.CLIP_STUDIO_CHROME;
   const name=`video-${Date.now()}.mp4`,output=join(work,name),quality=exportEncodingOptions(project.settings);
   const checkpoint=join(work,'checkpoints',checkpointKey(project,prepared,folder,quality));
@@ -73,13 +75,15 @@ export async function renderWithRemotion(project,folder,update){
   const videoProps={project:{...prepared,videoOnly:true}};
   try{
     update(25,'Iniciando Chrome y preparando el render');
-    const composition=await selectComposition({...options,id:'ClipStudio',inputProps:videoProps});
+    const composition=await timed('compositionMs',()=>selectComposition({...options,id:'ClipStudio',inputProps:videoProps}));
     const totalFrames=composition.durationInFrames,segments=Math.ceil(totalFrames/CHUNK_FRAMES),files=[];
     for(let index=0;index<segments;index++){
       const from=index*CHUNK_FRAMES,to=Math.min(totalFrames-1,from+CHUNK_FRAMES-1),count=to-from+1;
       const file=join(checkpoint,`segment-${String(index).padStart(4,'0')}.mp4`);
       files.push(file);
+      const segmentStarted=performance.now();
       if(await validVideo(file,count)){
+        timings.videoSegments.push({index:index+1,frames:count,reused:true,durationMs:Math.round(performance.now()-segmentStarted)});
         update(25+Math.round((index+1)/segments*65),`Tramo ${index+1}/${segments} ya guardado`);
         continue;
       }
@@ -93,34 +97,41 @@ export async function renderWithRemotion(project,folder,update){
           break;
         }catch(error){rmSync(temporary,{force:true});if(attempt===2)throw Error(`Falló el tramo ${index+1}/${segments}. Los anteriores quedaron guardados para reanudar. ${error.message}`);}
       }
+      timings.videoSegments.push({index:index+1,frames:count,reused:false,durationMs:Math.round(performance.now()-segmentStarted)});
     }
+    timings.videoRenderingMs=timings.videoSegments.reduce((sum,segment)=>sum+segment.durationMs,0);
     const visual=join(checkpoint,'visual.mp4');
-    if(!await validVideo(visual,totalFrames)){
+    timings.videoConcatReused=await validVideo(visual,totalFrames);
+    if(!timings.videoConcatReused){
       update(91,'Uniendo tramos de video');
-      await concatVideo(files,visual);
+      await timed('videoConcatMs',()=>concatVideo(files,visual));
       if(!await validVideo(visual,totalFrames))throw Error('La unión de tramos produjo un video incompleto');
     }
     const hasAudio=Boolean(project.narrationId||project.musicId||(project.scenes||[]).some(s=>s.sfxId));
+    timings.hasAudio=hasAudio;
     if(hasAudio){
       const audio=join(checkpoint,'audio.m4a');
-      if(!await probe(audio,'audio')){
+      timings.audioReused=!!await probe(audio,'audio');
+      if(!timings.audioReused){
         update(94,'Mezclando voz, música y efectos');
         const temporary=join(checkpoint,`audio.${process.pid}.tmp.m4a`);
         try{
+          const audioStarted=performance.now();
           const audioProps={project:{...prepared,audioOnly:true}};
           const audioComposition=await selectComposition({...options,id:'ClipStudio',inputProps:audioProps});
           await renderMedia({...options,composition:audioComposition,inputProps:audioProps,codec:'aac',audioBitrate:'192k',outputLocation:temporary,overwrite:true,concurrency:renderConcurrency,timeoutInMilliseconds:90000,onProgress:({progress})=>update(94+Math.round(progress*3),`Mezclando audio · ${Math.round(progress*100)}%`)});
           if(!await probe(temporary,'audio'))throw Error('No se pudo generar la pista de audio');
           renameSync(temporary,audio);
+          timings.audioRenderMs=Math.round(performance.now()-audioStarted);
         }finally{rmSync(temporary,{force:true});}
       }
       update(98,'Uniendo video y audio');
-      await execute('ffmpeg',['-y','-hide_banner','-loglevel','error','-i',visual,'-i',audio,'-map','0:v:0','-map','1:a:0','-c','copy','-movflags','+faststart',output],{maxBuffer:2_000_000});
+      await timed('finalMuxMs',()=>execute('ffmpeg',['-y','-hide_banner','-loglevel','error','-i',visual,'-i',audio,'-map','0:v:0','-map','1:a:0','-c','copy','-movflags','+faststart',output],{maxBuffer:2_000_000}));
     }else{
       update(98,'Finalizando MP4');
-      await execute('ffmpeg',['-y','-hide_banner','-loglevel','error','-i',visual,'-c','copy','-movflags','+faststart',output],{maxBuffer:2_000_000});
+      await timed('finalMuxMs',()=>execute('ffmpeg',['-y','-hide_banner','-loglevel','error','-i',visual,'-c','copy','-movflags','+faststart',output],{maxBuffer:2_000_000}));
     }
-    if(!await validVideo(output,totalFrames))throw Error('El MP4 final quedó incompleto');
+    if(!await timed('validationMs',()=>validVideo(output,totalFrames)))throw Error('El MP4 final quedó incompleto');
     rmSync(checkpoint,{recursive:true,force:true});
   }catch(error){
     rmSync(output,{force:true});
@@ -129,5 +140,6 @@ export async function renderWithRemotion(project,folder,update){
     throw error;
   }
   update(99,'MP4 listo');
-  return {name,duration:prepared.duration,width:prepared.width,height:prepared.height,createdAt:new Date().toISOString(),preview:false};
+  timings.renderMs=Math.round(performance.now()-renderStarted);
+  return {name,duration:prepared.duration,width:prepared.width,height:prepared.height,createdAt:new Date().toISOString(),preview:false,timings};
 }

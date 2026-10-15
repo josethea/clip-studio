@@ -1,4 +1,4 @@
-const EDITABLE_KEYS=['scenes','textLayers','subtitleCues','settings','narrationId','musicId'];
+const EDITABLE_KEYS=['scenes','textLayers','subtitleCues','subtitleSources','subtitleSource','settings','narrationId','musicId'];
 
 export function editableSnapshot(project){
   return JSON.stringify(Object.fromEntries(EDITABLE_KEYS.map(key=>[key,project[key]])));
