@@ -3,7 +3,7 @@ import {prepareRemotionProject} from '/remotion-data.mjs';
 import {createEditorSession} from '/editor-session.mjs';
 import {createPreviewSession} from '/editor-preview-session.mjs';
 import {exportView} from '/export-view.mjs';
-import {getCredential,subscribeCredentials} from '/credential-session.mjs';
+import {getCredential,subscribeCredentials} from '/studio-ui.js';
 import {createMediaService} from '/media-service.mjs';
 import {createStockSearch} from '/media-search.mjs';
 import {MEDIA_PAGE_SIZE as PAGE_SIZE,missingMediaIndices as collectMissingMedia,mediaBoardIndices as collectBoardIndices,nextMissingScene as findNextMissingScene,sceneSearchTerm,pagination,mediaBoardView} from '/media-board-model.mjs';

@@ -18,6 +18,8 @@ import {RenamePanel} from './rename.jsx';
 import {GeminiPanel,KeysPanel,PromptsPanel} from './sidebar-tools.jsx';
 import {StudioShell} from './studio-shell.jsx';
 export {filesFromDrop} from './file-drop.jsx';
+// The controller imports these from this bundle so React inputs and API calls share one store.
+export {getCredential,subscribeCredentials} from '../credential-session.mjs';
 
 const uiSlice=createSlice({
   name:'studioUi',

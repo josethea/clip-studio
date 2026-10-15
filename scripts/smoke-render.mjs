@@ -15,10 +15,24 @@ const pause=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 async function api(path,options={}){
   const response=await fetch(`${origin}/api/studio${path}`,options);
   const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw Error(data.error||`HTTP ${response.status}: ${path}`);
+  if(!response.ok){const error=Error(data.error||`HTTP ${response.status}: ${path}`);error.status=response.status;throw error;}
   return data;
 }
 const json=(method,value)=>({method,headers:{'content-type':'application/json'},body:JSON.stringify(value)});
+
+async function pollTask(projectId,taskId){
+  const path=`/projects/${projectId}/tasks/${taskId}`;
+  for(let attempt=1;attempt<=10;attempt++){
+    try{return await api(path);}
+    catch(error){
+      if(error.status===404)throw Error('La tarea desapareció del servidor. Probablemente la app se reinició durante el render; revisa los registros de su servicio en el VPS. El proyecto temporal se conservó.');
+      if(error.status)throw error;
+      if(attempt===10)throw Error(`Se perdió la conexión con la app durante el render tras ${attempt} intentos: ${error.message}. Revisa los registros del servicio y los eventos OOM del VPS. El proyecto temporal se conservó.`);
+      if(attempt===1)console.warn('Se cortó la conexión local con la app; esperando a que vuelva a responder…');
+      await pause(1500);
+    }
+  }
+}
 
 async function makeInputs(folder){
   const image=join(folder,'smoke-image.png'),video=join(folder,'smoke-video.mp4');
@@ -56,7 +70,7 @@ try{
   const task=await api(`/projects/${projectId}/render`,json('POST',{}));
   const started=Date.now();let last='';
   while(Date.now()-started<timeoutMs){
-    taskStatus=await api(`/projects/${projectId}/tasks/${task.id}`);
+    taskStatus=await pollTask(projectId,task.id);
     const line=`${taskStatus.progress}% · ${taskStatus.detail}`;
     if(line!==last){console.log(line);last=line;}
     if(taskStatus.status==='error')throw Error(taskStatus.error||'Falló el render');
@@ -74,5 +88,5 @@ try{
   if(projectId&&!keep&&taskStatus?.status!=='running'){
     try{await api(`/projects/${projectId}`,{method:'DELETE'});console.log('Proyecto temporal eliminado.');}
     catch(error){console.error(`No se pudo eliminar el proyecto temporal ${projectId}: ${error.message}`);}
-  }else if(projectId&&taskStatus?.status==='running')console.error(`El render sigue activo; proyecto temporal conservado: ${projectId}`);
+  }else if(projectId&&taskStatus?.status==='running')console.error(`No se confirmó el estado final del render; proyecto temporal conservado: ${projectId}`);
 }
